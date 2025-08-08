@@ -15,7 +15,7 @@ Before you begin, ensure you have the following installed on your system:
 It is recommended to use a virtual environment to manage dependencies.
 
 ```bash
-python -m venv myenv
+python3 -m venv myenv
 source myenv/bin/activate  # On Windows use `myenv\Scripts\activate`
 ```
 
@@ -24,7 +24,7 @@ source myenv/bin/activate  # On Windows use `myenv\Scripts\activate`
 Install the necessary Python packages using pip:
 
 ```bash
-pip install numpy PyQt5 matplotlib
+pip3 install numpy PyQt5 matplotlib
 ```
 
 ## Troubleshooting
@@ -38,11 +38,11 @@ pip install numpy PyQt5 matplotlib
 Ensure your main application script includes the necessary imports and run it using Python:
 
 ```bash
-python mini-soraps.py
+python3 mini-soraps.py
 ```
 or with arguments:
 ```bash
-python mini-soraps.py [-h] [--Fmin FMIN] [--Fmax FMAX] [--SL SL] [--SH SH] [--B B] [--DI DI] [--T T] [--Dmin DMIN] [--Dmax DMAX] [--DT DT] [--PFA PFA] [--SeaState SEASTATE] [--Temp TEMP] [--Depth DEPTH] [--TypeTraitement {Incoherent,Coherent}] [--save]
+python3 mini-soraps.py [-h] [--Fmin FMIN] [--Fmax FMAX] [--SL SL] [--SH SH] [--B B] [--DI DI] [--T T] [--Dmin DMIN] [--Dmax DMAX] [--DT DT] [--PFA PFA] [--SeaState SEASTATE] [--Temp TEMP] [--Depth DEPTH] [--TypeTraitement {Incoherent,Coherent}] [--save]
 
 ```
 
