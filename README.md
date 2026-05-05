@@ -32,6 +32,7 @@ pip3 install numpy PyQt5 matplotlib
 - If you encounter any issues during installation, ensure that your pip version is up-to-date by running `pip install --upgrade pip`.
 - Make sure you have the necessary permissions to install packages on your system.
 - If you are behind a proxy, configure pip to use the proxy settings.
+- If you encounter issues with Wayland, try with `QT_QPA_PLATFORM=xcb python3 ./mini-soraps.py`
 
 # Running The Application
 
