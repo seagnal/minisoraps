@@ -15,8 +15,8 @@ Before you begin, ensure you have the following installed on your system:
 It is recommended to use a virtual environment to manage dependencies.
 
 ```bash
-python3 -m venv myenv
-source myenv/bin/activate  # On Windows use `myenv\Scripts\activate`
+python3 -m venv minisoraps_env
+source minisoraps_env/bin/activate  # On Windows use `minisoraps_env\Scripts\activate`
 ```
 
 ## Step 2: Install Required Packages
@@ -42,11 +42,11 @@ python3 mini-soraps.py
 ```
 or with arguments:
 ```bash
-python3 mini-soraps.py [-h] [--Fmin FMIN] [--Fmax FMAX] [--SL SL] [--SH SH] [--B B] [--DI DI] [--T T] [--Dmin DMIN] [--Dmax DMAX] [--DT DT] [--PFA PFA] [--SeaState SEASTATE] [--Temp TEMP] [--Depth DEPTH] [--TypeTraitement {Incoherent,Coherent}] [--save]
+python3 mini-soraps.py [-h] [--SonarType {Active,Passive}] [--ProcessingType {Incoherent,Coherent}] [--Fmin FMIN] [--Fmax FMAX] [--SL SL] [--SH SH] [--Ne NE] [--B B] [--DI DI] [--T T] [--Dmin DMIN] [--Dmax DMAX] [--DT DT] [--PFA PFA] [--NbCell NBCELL] [--SeaState SEASTATE] [--Temp TEMP] [--Depth DEPTH] [--C C] [--Bottom BOTTOM] [--BearingAperture BEARINGAPERTURE] [--ElevationAperture ELEVATIONAPERTURE] [--TS TS] [--Turbidity {Clear,Moderate,Turbid,VeryTurbid}] [--SeabedType {Rock,Sand,Mud}] [--save]
 
 ```
 
 # Additional Resources
 
-- [SORAPS SEAGNAL Website] (http://products.seagnal.fr)
+- [SORAPS SEAGNAL Website] (http://www.seagnal.fr)
 
