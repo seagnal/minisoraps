@@ -31,11 +31,12 @@ import sys
 import argparse
 import numpy as np
 import math
-from PyQt5.QtWidgets import QAction, QScrollArea, QApplication, QMainWindow, QDockWidget, QVBoxLayout, QGridLayout, QWidget, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QLabel, QSplashScreen, QTextBrowser
+from PyQt5.QtWidgets import QStatusBar, QAction, QScrollArea, QApplication, QMainWindow, QDockWidget, QVBoxLayout, QGridLayout, QWidget, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QLabel, QSplashScreen, QTextBrowser
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.widgets import Cursor
 
 linestyle_tuple = {
      'loosely dotted':        (0, (1, 10)),
@@ -448,7 +449,8 @@ class MainWindow(QMainWindow):
     def initUI(self):
         self.setWindowTitle('mini SORAPS by SEAGNAL')
         self.setGeometry(100, 100, 800, 600)
-
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
         # Menu Bar
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
@@ -491,90 +493,131 @@ class MainWindow(QMainWindow):
         self.spinboxes['Fmin'].setRange(100, 1000000)
         self.spinboxes['Fmin'].setSuffix(' Hz')
         self.spinboxes['Fmin'].setValue(self.args.Fmin)
-
+        self.spinboxes['Fmin'].setToolTip("Minimum frequency of the sonar bandwidth (Hz). Controls the lowest frequency component of the sonar signal.")
+        
         self.spinboxes['Fmax'].setRange(100, 1000000)
         self.spinboxes['Fmax'].setSuffix(' Hz')
         self.spinboxes['Fmax'].setValue(self.args.Fmax)
+        self.spinboxes['Fmax'].setToolTip("Maximum frequency of the sonar bandwidth (Hz). Controls the highest frequency component of the sonar signal.")
+        
 
         self.spinboxes['SL'].setRange(10, 230)
         self.spinboxes['SL'].setSuffix(' dB')
         self.spinboxes['SL'].setValue(self.args.SL)
+        self.spinboxes['SL'].setToolTip("Source level (SL) of the sonar signal (dBuPa). Represents the acoustic power emitted by the sonar transducer.")
+        
 
         self.spinboxes['SH'].setRange(-220, -150)
         self.spinboxes['SH'].setSuffix(' dBV/uPa')
         self.spinboxes['SH'].setValue(self.args.SH)
+        self.spinboxes['SH'].setToolTip("Sensor sensitivity (SH) (dBV/uPa). Indicates the voltage output of the hydrophone for a given acoustic pressure input.")
+        
 
         self.spinboxes['Ne'].setRange(1, 200)
         self.spinboxes['Ne'].setSuffix(' nV/sqrt(Hz)')
         self.spinboxes['Ne'].setValue(self.args.Ne)
+        self.spinboxes['Ne'].setToolTip("Electronic noise (Ne) (nV/sqrt(Hz)). Represents the noise floor of the sonar receiver system.")
+        
 
         self.spinboxes['B'].setRange(0.01, 50000)
         self.spinboxes['B'].setSuffix(' Hz')
         self.spinboxes['B'].setValue(self.args.B)
+        self.spinboxes['B'].setToolTip("Bandwidth (B) of the sonar system (Hz). Determines the frequency range over which the sonar operates.")
+        
 
         self.spinboxes['DI'].setRange(0, 50)
         self.spinboxes['DI'].setSuffix(' dB')
         self.spinboxes['DI'].setValue(self.args.DI)
+        self.spinboxes['DI'].setToolTip("Detection integration time (DI) (dB). Represents the system's ability to integrate signals over time for detection.")
+        
 
         self.spinboxes['T'].setRange(0.001, 50)
         self.spinboxes['T'].setSuffix(' s')
         self.spinboxes['T'].setValue(self.args.T)
+        self.spinboxes['T'].setToolTip("Integration time (T) (s). The time over which the sonar integrates the received signal for processing.")
+        
 
         self.spinboxes['Dmin'].setRange(1, 100000)
         self.spinboxes['Dmin'].setSuffix(' m')
         self.spinboxes['Dmin'].setValue(self.args.Dmin)
+        self.spinboxes['Dmin'].setToolTip("Minimum operating range (Dmin) (m). The closest distance at which the sonar can effectively operate.")
+        
 
         self.spinboxes['Dmax'].setRange(self.args.Dmin, 100000)
         self.spinboxes['Dmax'].setSuffix(' m')
         self.spinboxes['Dmax'].setValue(self.args.Dmax)
+        self.spinboxes['Dmax'].setToolTip("Maximum operating range (Dmax) (m). The farthest distance at which the sonar can effectively operate.")
+        
 
         self.spinboxes['DT'].setRange(0, 50)
         self.spinboxes['DT'].setSuffix(' dB')
         self.spinboxes['DT'].setValue(self.args.DT)
+        self.spinboxes['DT'].setToolTip("Detection threshold (DT) (dB). The minimum signal level required for detection above the noise floor.")
+        
         
         self.spinboxes['PFA'].setRange(-9, -2)
         self.spinboxes['PFA'].setSuffix(' 10**')
         self.spinboxes['PFA'].setValue(self.args.PFA)
+        self.spinboxes['PFA'].setToolTip("Probability of false alarm (PFA) (10**). The likelihood of incorrectly detecting a signal when no actual target is present.")
+        
 
         self.spinboxes['SeaState'].setRange(0, 6)
         self.spinboxes['SeaState'].setSuffix('')
         self.spinboxes['SeaState'].setValue(self.args.SeaState)
+        self.spinboxes['SeaState'].setToolTip("Sea state (0-6). Indicates the wave height and sea conditions (0 = calm, 6 = very rough).")
+        
 
         self.spinboxes['Depth'].setRange(0, 10000)
         self.spinboxes['Depth'].setSuffix(' m')
         self.spinboxes['Depth'].setValue(self.args.Depth)
+        self.spinboxes['Depth'].setToolTip("Sonar operating depth (m). The depth at which the sonar is positioned in the water column.")
+        
 
         self.spinboxes['Temp'].setRange(0, 60)
         self.spinboxes['Temp'].setSuffix(' degC')
         self.spinboxes['Temp'].setValue(self.args.Temp)
+        self.spinboxes['Temp'].setToolTip("Water temperature (°C). Affects sound velocity and absorption in seawater.")
+        
 
         self.spinboxes['BearingAperture'].setRange(1, 360)
         self.spinboxes['BearingAperture'].setSuffix(' deg')
         self.spinboxes['BearingAperture'].setValue(self.args.BearingAperture)
+        self.spinboxes['BearingAperture'].setToolTip("Bearing aperture (deg). The angular width of the active sonar beam in the horizontal plane (0-360 degrees).")
 
         self.spinboxes['ElevationAperture'].setRange(1, 360)
         self.spinboxes['ElevationAperture'].setSuffix(' deg')
         self.spinboxes['ElevationAperture'].setValue(self.args.ElevationAperture)
+        self.spinboxes['ElevationAperture'].setToolTip("Elevation aperture (deg). The angular width of the active sonar beam in the vertical plane (0-360 degrees).")
+        
 
         self.spinboxes['TS'].setRange(-50, 50)
         self.spinboxes['TS'].setSuffix(' dB')
         self.spinboxes['TS'].setValue(self.args.TS)
+        self.spinboxes['TS'].setToolTip("Target strength (TS) (dB). A measure of how much sound a target reflects back to the active sonar.")
+        
 
         self.spinboxes['NbCell'].setRange(1, 100)
         self.spinboxes['NbCell'].setSuffix(' dB')
         self.spinboxes['NbCell'].setValue(self.args.NbCell)
+        self.spinboxes['NbCell'].setToolTip("Number of cells integrated (NbCell). The number of accuracy celles integrated for detection.")
+        
 
         self.spinboxes['Bottom'].setRange(0, 10000)
         self.spinboxes['Bottom'].setSuffix(' m')
         self.spinboxes['Bottom'].setValue(self.args.Bottom)
+        self.spinboxes['Bottom'].setToolTip("Seabed depth (m). The depth of the ocean floor at the sonar location. Used for active sonar reverberation")
+        
 
         self.spinboxes['C'].setRange(1300, 1600)
         self.spinboxes['C'].setSuffix(' m/s')
         self.spinboxes['C'].setValue(self.args.C)
+        self.spinboxes['C'].setToolTip("Sound velocity (C) (m/s). The speed of sound in seawater, which varies with temperature, salinity, and pressure. Used for active sonar resolution")
+        
 
         row = 0
         self.sonar_type = QComboBox()
         self.sonar_type.addItems(['Passive', 'Active'])
+        self.sonar_type.setToolTip("Select sonar type: Passive (listens to ambient sounds) or Active (emits and receives sonar signals).")
         self.sonar_type.currentTextChanged.connect(self.update_plots)
         config_layout.addWidget(QLabel('SonarType'), row, 0)
         self.sonar_type.setCurrentText(self.args.SonarType)
@@ -583,6 +626,7 @@ class MainWindow(QMainWindow):
         row += 1
         self.combo_type = QComboBox()
         self.combo_type.addItems(['Incoherent', 'Coherent'])
+        self.combo_type.setToolTip("Select processing type: Incoherent (sums power) or Coherent (sums complex signals).")
         self.combo_type.currentTextChanged.connect(self.update_plots)
         config_layout.addWidget(QLabel('ProcessingType'), row, 0)
         self.combo_type.setCurrentText(self.args.ProcessingType)
@@ -597,6 +641,7 @@ class MainWindow(QMainWindow):
         row += 1
         self.seabed_type = QComboBox()
         self.seabed_type.addItems(['Rock', 'Sand', 'Mud'])
+        self.seabed_type.setToolTip("Select seabed type: Rock (hard surface), Sand (sediment), or Mud (soft sediment). Affects active sonar reverberation.")
         self.seabed_type.currentTextChanged.connect(self.update_plots)
         config_layout.addWidget(QLabel('SeabedType'), row, 0)
         self.seabed_type.setCurrentText(self.args.SeabedType)
@@ -606,6 +651,7 @@ class MainWindow(QMainWindow):
         self.turbidity = QComboBox()
         self.turbidity.addItems(["Clear", "Moderate", "Turbid", "VeryTurbid"])
         self.turbidity.currentTextChanged.connect(self.update_plots)
+        self.turbidity.setToolTip("Select water turbidity level: Clear (low particles) to VeryTurbid (high particles). Affects active sonar signal attenuation.")
         config_layout.addWidget(QLabel('Turbidity'), row, 0)
         self.turbidity.setCurrentText(self.args.Turbidity)
         config_layout.addWidget(self.turbidity, row, 1)
@@ -631,6 +677,8 @@ class MainWindow(QMainWindow):
 
         self.figure_es = Figure(figsize=figsize)
         self.canvas_es = FigureCanvas(self.figure_es)
+        self.canvas_es.mpl_connect("motion_notify_event", self.on_mouse_move)
+
         plot_layout.addWidget(self.canvas_es)
 
         plot_widget.setLayout(plot_layout)
@@ -645,6 +693,7 @@ class MainWindow(QMainWindow):
 
         self.figure_pod = Figure(figsize=figsize)
         self.canvas_pod = FigureCanvas(self.figure_pod)
+        self.canvas_pod.mpl_connect("motion_notify_event", self.on_mouse_move)
         plot_layout.addWidget(self.canvas_pod)
 
         plot_widget.setLayout(plot_layout)
@@ -659,6 +708,7 @@ class MainWindow(QMainWindow):
 
         self.figure_cp = Figure(figsize=figsize)
         self.canvas_cp = FigureCanvas(self.figure_cp)
+        self.canvas_cp.mpl_connect("motion_notify_event", self.on_mouse_move)
         cp_layout.addWidget(self.canvas_cp)
 
         cp_widget.setLayout(cp_layout)
@@ -673,6 +723,7 @@ class MainWindow(QMainWindow):
 
         self.figure_noise = Figure(figsize=figsize)
         self.canvas_noise = FigureCanvas(self.figure_noise)
+        self.canvas_noise.mpl_connect("motion_notify_event", self.on_mouse_move)
         noise_layout.addWidget(self.canvas_noise)
 
         noise_widget.setLayout(noise_layout)
@@ -685,9 +736,10 @@ class MainWindow(QMainWindow):
         sh_widget = QWidget()
         sh_layout = QVBoxLayout()
 
-        self.figure_sh = Figure(figsize=figsize)
-        self.canvas_sh = FigureCanvas(self.figure_sh)
-        sh_layout.addWidget(self.canvas_sh)
+        self.figure_volt = Figure(figsize=figsize)
+        self.canvas_volt = FigureCanvas(self.figure_volt)
+        self.canvas_volt.mpl_connect("motion_notify_event", self.on_mouse_move)
+        sh_layout.addWidget(self.canvas_volt)
 
         sh_widget.setLayout(sh_layout)
         dock_v.setWidget(sh_widget)
@@ -730,6 +782,7 @@ class MainWindow(QMainWindow):
 
         self.figure_scattering_surface = Figure(figsize=figsize)
         self.canvas_scattering_surface = FigureCanvas(self.figure_scattering_surface)
+        self.canvas_scattering_surface.mpl_connect("motion_notify_event", self.on_mouse_move)
         scattering_surface_layout.addWidget(self.canvas_scattering_surface)
 
         scattering_surface_widget.setLayout(scattering_surface_layout)
@@ -744,6 +797,7 @@ class MainWindow(QMainWindow):
 
         self.figure_scattering_bottom = Figure(figsize=figsize)
         self.canvas_scattering_bottom = FigureCanvas(self.figure_scattering_bottom)
+        self.canvas_scattering_bottom.mpl_connect("motion_notify_event", self.on_mouse_move)
         scattering_bottom_layout.addWidget(self.canvas_scattering_bottom)
 
         scattering_bottom_widget.setLayout(scattering_bottom_layout)
@@ -798,12 +852,32 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(dock_cp, dock_pod)
         self.tabifyDockWidget(dock_pod, dock_es)
 
+        self.dock_bargraph_N = dock_bargraph_N
+        self.dock_bargraph_A = dock_bargraph_A
+        self.dock_bargraph_VS = dock_bargraph_VS
+        self.dock_scattering_surface = dock_scattering_surface
+        self.dock_scattering_bottom = dock_scattering_bottom
+        self.dock_v = dock_v
+        self.dock_noise = dock_noise
+        self.dock_cp = dock_cp
+        self.dock_pod = dock_pod
+        self.dock_es = dock_es
+
         self.init = True
         self.update_plots()
 
         if self.args.save:
             self.save_plot()
             sys.exit(0)
+
+
+    def on_mouse_move(self, event):
+        if event.inaxes:
+            # Get the mouse coordinates in data units
+            x, y = event.xdata, event.ydata
+            print(f"x: {x:.2f}, y: {y:.2f}")
+            # Update the status bar
+            self.status_bar.showMessage(f"x: {x:.2f}, y: {y:.2f}")
 
     def update_plots(self):
         if not self.init:
@@ -835,6 +909,24 @@ class MainWindow(QMainWindow):
         TS = self.spinboxes['TS'].value()
         K = self.spinboxes['NbCell'].value()
 
+        if SonarType == 'Active':
+            is_active = True
+            self.spinboxes['NbCell'].setEnabled(True)
+        else:
+            is_active = False
+            if ProcessingType == "Coherent":
+                self.spinboxes['NbCell'].setEnabled(True)
+            else:
+                self.spinboxes['NbCell'].setEnabled(False)
+
+        self.seabed_type.setEnabled(is_active)
+        self.turbidity.setEnabled(is_active)
+        self.spinboxes['C'].setEnabled(is_active)
+        self.spinboxes['TS'].setEnabled(is_active)
+        self.spinboxes['Bottom'].setEnabled(is_active)
+        self.spinboxes['BearingAperture'].setEnabled(is_active)
+        self.spinboxes['ElevationAperture'].setEnabled(is_active)
+
 
         d = np.arange(Dmin, Dmax + 1, 1)
         f = np.transpose(np.array([Fmin, (Fmin + Fmax) / 2, Fmax]))
@@ -861,7 +953,7 @@ class MainWindow(QMainWindow):
         
 
         #print(SonarType)
-        if SonarType == 'Active':
+        if is_active:
             CP = 2.0*(20.0 * np.log10(d[:, np.newaxis]) + alpha * d[:, np.newaxis])
 
             Resolution = C/(2*B)
@@ -895,7 +987,9 @@ class MainWindow(QMainWindow):
             print('SS',surface_scattering)
             print('BS',seabed_scattering)
             Nr_seabed = SL - CP + 10*np.log10(A_seabed[:,np.newaxis])+(seabed_scattering)
+            Nr_seabed[d<(Bottom-Depth),:] = 0
             Nr_surface =  SL - CP + 10*np.log10(A_surface[:,np.newaxis])+(surface_scattering)
+            Nr_surface[d<Depth,:] = 0
             Nv =  SL - CP + 10*np.log10(V[:,np.newaxis])+(volume_scattering)
             print('V',Nv)
             print('SS',Nr_surface)
@@ -978,34 +1072,37 @@ class MainWindow(QMainWindow):
         
         # Plot POD
         self.figure_pod.clear()
-        ax = self.figure_pod.add_subplot(111)
-        ax.plot(d, POD_o[:, 0], label='Fmin', color='blue')
-        ax.plot(d, POD_o[:, 1], label='Fmoy', color='gray', linestyle='dotted')
-        ax.plot(d, POD_o[:, 2], label='Fmax', color='red')
-        ax.grid()
-        ax.legend()
-        ax.set_xlabel('Distance (m)')
-        ax.set_ylabel('POD (dB)')
-        ax.set_title(f'POD {self.combo_type.currentText()}')
-        ax.set_ylim(-0.1, 1.1)
+        ax_pod = self.figure_pod.add_subplot(111)
+        cursor_pod = Cursor(ax_pod, color='black', linewidth=1)
+        ax_pod.plot(d, POD_o[:, 0], label='Fmin', color='blue')
+        ax_pod.plot(d, POD_o[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax_pod.plot(d, POD_o[:, 2], label='Fmax', color='red')
+        ax_pod.grid()
+        ax_pod.legend()
+        ax_pod.set_xlabel('Distance (m)')
+        ax_pod.set_ylabel('POD (dB)')
+        ax_pod.set_title(f'POD {self.combo_type.currentText()}')
+        ax_pod.set_ylim(-0.1, 1.1)
         self.canvas_pod.draw()
 
         # Plot ES
         self.figure_es.clear()
-        ax = self.figure_es.add_subplot(111)
-        ax.plot(d, ES_db[:, 0], label='Fmin', color='blue')
-        ax.plot(d, ES_db[:, 1], label='Fmoy', color='gray', linestyle='dotted')
-        ax.plot(d, ES_db[:, 2], label='Fmax', color='red')
-        ax.grid()
-        ax.legend()
-        ax.set_xlabel('Distance (m)')
-        ax.set_ylabel('ES (dB)')
-        ax.set_title(f'ES {self.combo_type.currentText()}')
+        ax_es = self.figure_es.add_subplot(111)
+        cursor_es = Cursor(ax_es, color='black', linewidth=1)
+        ax_es.plot(d, ES_db[:, 0], label='Fmin', color='blue')
+        ax_es.plot(d, ES_db[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax_es.plot(d, ES_db[:, 2], label='Fmax', color='red')
+        ax_es.grid()
+        ax_es.legend()
+        ax_es.set_xlabel('Distance (m)')
+        ax_es.set_ylabel('ES (dB)')
+        ax_es.set_title(f'ES {self.combo_type.currentText()}')
         self.canvas_es.draw()
 
         # Plot CP
         self.figure_cp.clear()
         ax_cp = self.figure_cp.add_subplot(111)
+        cursor_cp = Cursor(ax_cp, color='black', linewidth=1)
         ax_cp.plot(d, CP[:, 0], label='Fmin', color='blue')
         ax_cp.plot(d, CP[:, 1], label='Fmoy', color='gray', linestyle='dotted')
         ax_cp.plot(d, CP[:, 2], label='Fmax', color='red')
@@ -1028,7 +1125,8 @@ class MainWindow(QMainWindow):
         self.figure_noise.clear()
         ax_noise = self.figure_noise.add_subplot(111)
 
-        if SonarType == 'Active':
+        if is_active:
+            #cursor_noise = Cursor(ax_noise, color='black', linewidth=2)
             ax_noise.plot(d, Nt[:, 0], label='Total Fmin', color='blue')
             ax_noise.plot(d, Nt[:, 1], label='Total Fmoy', color='blue', linestyle='dotted')
             ax_noise.plot(d, Nt[:, 2], label='Total Fmax', color='blue', linestyle='dashdot')
@@ -1071,21 +1169,23 @@ class MainWindow(QMainWindow):
         self.canvas_noise.draw()
 
         # Plot SH
-        self.figure_sh.clear()
-        ax_sh = self.figure_sh.add_subplot(111)
-        ax_sh.semilogy(d, V[:,0], label='Fmin', color='blue')
-        ax_sh.semilogy(d, V[:, 1], label='Fmoy', color='gray', linestyle='dotted')
-        ax_sh.semilogy(d, V[:, 2], label='Fmax', color='red')
-        ax_sh.legend()
-        ax_sh.grid()
-        ax_sh.set_xlabel('Distance (m)')
-        ax_sh.set_ylabel('Vrms')
-        ax_sh.set_title(f'Voltage at sensor')
-        self.canvas_sh.draw()
+        self.figure_volt.clear()
+        ax_volt = self.figure_volt.add_subplot(111)
+        #cursor_volt = Cursor(ax_volt, color='black', linewidth=1)
+        ax_volt.semilogy(d, V[:,0], label='Fmin', color='blue')
+        ax_volt.semilogy(d, V[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax_volt.semilogy(d, V[:, 2], label='Fmax', color='red')
+        ax_volt.legend()
+        ax_volt.grid()
+        ax_volt.set_xlabel('Distance (m)')
+        ax_volt.set_ylabel('Vrms')
+        ax_volt.set_title(f'Voltage at sensor')
+        self.canvas_volt.draw()
 
         # Bar Graph N vs f
         self.figure_bargraph_N.clear()
         ax_bargraph_N = self.figure_bargraph_N.add_subplot(111)
+        #cursor_bargraph_N = Cursor(ax_bargraph_N, color='black', linewidth=2)
         ax_bargraph_N.bar(['Fmin','Fmoy','Fmax'], Na, color=['blue','gray','red'])
         ax_bargraph_N.set_xlabel('Frequency (Hz)')
         ax_bargraph_N.set_ylabel('N (dBuPa/sqrt(Hz))')
@@ -1097,6 +1197,7 @@ class MainWindow(QMainWindow):
         VS = volume_scattering_strength(f,turbidity=Turbidity)
         self.figure_bargraph_VS.clear()
         ax_bargraph_VS = self.figure_bargraph_VS.add_subplot(111)
+        #cursor_bargraph_VS = Cursor(ax_bargraph_VS, color='black', linewidth=2)
         ax_bargraph_VS.bar(['Fmin','Fmoy','Fmax'], VS, color=['blue','gray','red'])
         ax_bargraph_VS.set_xlabel('Frequency (Hz)')
         ax_bargraph_VS.set_ylabel('(dB)')
@@ -1108,6 +1209,7 @@ class MainWindow(QMainWindow):
         # Bar Graph N vs f
         self.figure_bargraph_A.clear()
         ax_bargraph_A = self.figure_bargraph_A.add_subplot(111)
+        #cursor_bargraph_A = Cursor(ax_bargraph_A, color='black', linewidth=2)
         ax_bargraph_A.bar(['Fmin','Fmoy','Fmax'], alpha, color=['blue','gray','red'])
         ax_bargraph_A.set_xlabel('Frequency (Hz)')
         ax_bargraph_A.set_ylabel('absorption db/m')
@@ -1121,6 +1223,7 @@ class MainWindow(QMainWindow):
         
         self.figure_scattering_surface.clear()
         ax_scattering_surface = self.figure_scattering_surface.add_subplot(111)
+        #cursor_scattering_surface = Cursor(ax_scattering_surface, color='black', linewidth=2)
         ax_scattering_surface.plot(angles_deg, SS[:, 0], label='Fmin', color='blue')
         ax_scattering_surface.plot(angles_deg, SS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
         ax_scattering_surface.plot(angles_deg, SS[:, 2], label='Fmax', color='red')
@@ -1135,6 +1238,7 @@ class MainWindow(QMainWindow):
         #print(BS)
         self.figure_scattering_bottom.clear()
         ax_scattering_bottom = self.figure_scattering_bottom.add_subplot(111)
+        #cursor_scattering_bottom = Cursor(ax_scattering_bottom, color='black', linewidth=2)
         ax_scattering_bottom.plot(angles_deg, BS[:, 0], label='Fmin', color='blue')
         ax_scattering_bottom.plot(angles_deg, BS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
         ax_scattering_bottom.plot(angles_deg, BS[:, 2], label='Fmax', color='red')
@@ -1152,15 +1256,44 @@ class MainWindow(QMainWindow):
         dpi = 150
 
         #figure_size = (6, 4)  # Width: 6 inches, Height: 4 inches
+        self.dock_pod.show()
+        self.dock_pod.raise_()
         self.figure_pod.savefig('plot_pod.png', dpi=dpi)
+        
+        self.dock_es.show()
+        self.dock_es.raise_()
         self.figure_es.savefig('plot_es.png', dpi=dpi)
+
+        self.dock_cp.show()
+        self.dock_cp.raise_()
         self.figure_cp.savefig('plot_cp.png', dpi=dpi)
-        self.figure_sh.savefig('plot_sh.png', dpi=dpi)
+
+        self.dock_v.show()
+        self.dock_v.raise_()
+        self.figure_volt.savefig('plot_voltage.png', dpi=dpi)
+
+        self.dock_noise.show()
+        self.dock_noise.raise_()
         self.figure_noise.savefig('plot_noise.png', dpi=dpi)
+
+        self.dock_scattering_bottom.show()
+        self.dock_scattering_bottom.raise_()
         self.figure_scattering_bottom.savefig('plot_scattering_bottom.png', dpi=dpi)
+
+        self.dock_scattering_surface.show()
+        self.dock_scattering_surface.raise_()
         self.figure_scattering_surface.savefig('plot_scattering_surface.png', dpi=dpi)
+
+        self.dock_bargraph_N.show()
+        self.dock_bargraph_N.raise_()
         self.figure_bargraph_N.savefig('plot_bargraph_N.png', dpi=dpi)
+
+        self.dock_bargraph_A.show()
+        self.dock_bargraph_A.raise_()
         self.figure_bargraph_A.savefig('plot_bargraph_A.png', dpi=dpi)
+
+        self.dock_bargraph_VS.show()
+        self.dock_bargraph_VS.raise_()
         self.figure_bargraph_VS.savefig('plot_bargraph_VS.png', dpi=dpi)
 
         # Open a file for writing
