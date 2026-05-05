@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 minisoraps_env
+variables.txt
+*.png
 
 # C extensions
 *.so

@@ -1152,11 +1152,20 @@ class MainWindow(QMainWindow):
         self.figure_es.savefig('plot_es.png')
         self.figure_cp.savefig('plot_cp.png')
         self.figure_sh.savefig('plot_sh.png')
+        self.figure_noise.savefig('plot_noise.png')
+        self.figure_scattering_bottom.savefig('plot_scattering_bottom.png')
+        self.figure_scattering_surface.savefig('plot_scattering_surface.png')
         self.figure_bargraph_N.savefig('plot_bargraph_N.png')
         self.figure_bargraph_A.savefig('plot_bargraph_A.png')
+        self.figure_bargraph_VS.savefig('plot_bargraph_VS.png')
 
         # Open a file for writing
         with open('variables.txt', 'w') as file:
+            file.write(f"ProcessingType: {self.combo_type.currentText()}\n")
+            file.write(f"SonarType: {self.sonar_type.currentText()}\n")
+            file.write(f"Turbidity: {self.turbidity.currentText()}\n")
+            file.write(f"SeaBedType: {self.seabed_type.currentText()}\n")
+
             for name, spinbox in self.spinboxes.items():
                 # Extract the unit from the spinbox suffix
                 unit = spinbox.suffix().strip()
