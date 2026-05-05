@@ -776,7 +776,7 @@ class MainWindow(QMainWindow):
         <p>This software is interfaced to 3D GHOM (Geography, Hydrography, Oceanography & Meteorology) databases to enable finer estimations of the characteristics of the acoustic channels between a reference point of the water column and many surrounding others, including full 4D simulations (3D+time) and 3D outputs.</p>
         <p>The <b>SORAPS</b> software is designed to predict the performance of sonar and underwater communication systems using 3D GHOM databases and detailed system specifications. These predictions can be obtained in real-time through actual measurements of parameters or in a predictive manner using statistical environmental data from specialized databases and predictive models.</p>
 
-        <p>For more information, on the full featured Software, visit the <a href="http://products.seagnal.fr/soraps">SORAPS product page</a>.</p>
+        <p>For more information, on the full featured Software, visit the <a href="http://www.seagnal.fr">SORAPS product page</a>.</p>
         
         <p>or write us a <a href="mailto:contact@seagnal.fr?subject=SORAPS">mail</a></p>
         
