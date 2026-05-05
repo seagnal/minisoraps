@@ -31,14 +31,74 @@ import sys
 import argparse
 import numpy as np
 import math
-from PyQt5.QtWidgets import QAction, QScrollArea, QApplication, QMainWindow, QDockWidget, QVBoxLayout, QWidget, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QLabel, QSplashScreen, QTextBrowser
+from PyQt5.QtWidgets import QAction, QScrollArea, QApplication, QMainWindow, QDockWidget, QVBoxLayout, QGridLayout, QWidget, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QLabel, QSplashScreen, QTextBrowser
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-# Fonction fictive pour l'absorption
+linestyle_tuple = {
+     'loosely dotted':        (0, (1, 10)),
+     'dotted':                (0, (1, 5)),
+    'densely dotted':        (0, (1, 1)),
 
+     'long dash with offset': (5, (10, 3)),
+     'loosely dashed':        (0, (5, 10)),
+     'dashed':                (0, (5, 5)),
+     'densely dashed':        (0, (5, 1)),
+
+     'loosely dashdotted':    (0, (3, 10, 1, 10)),
+     'dashdotted':            (0, (3, 5, 1, 5)),
+     'densely dashdotted':    (0, (3, 1, 1, 1)),
+
+     'dashdotdotted':         (0, (3, 5, 1, 5, 1, 5)),
+     'loosely dashdotdotted': (0, (3, 10, 1, 10, 1, 10)),
+     'densely dashdotdotted': (0, (3, 1, 1, 1, 1, 1))
+}
+
+def inverse_erf(y, max_iter=10, tol=1e-12):
+    """
+    Approximation de l'inverse de la fonction d'erreur.
+    
+    Parameters
+    ----------
+    y : array_like
+        Valeurs dans l'intervalle [-1, 1] (ou plus strictement [-1+ε, 1-ε] pour éviter l'extremité).
+    max_iter : int, optional
+        Nombre maximal d'itérations de Newton.
+    tol : float, optional
+        Tolérance de convergence (abs(Δx) < tol).
+    
+    Returns
+    -------
+    x : ndarray
+        Valeur de x telle que erf(x) ≈ y.
+    """
+    np_erf = np.vectorize(math.erf)
+    y = np.asarray(y, dtype=float)
+
+    # Cas particulier : y==±1 => x→±∞, on limite artificiellement
+    y = np.clip(y, -0.9999999999999999, 0.9999999999999999)
+
+    # Initialisation : approximation simple
+    x = np.sqrt(np.pi)/2 * y   # x ≈ (√π/2) y
+
+    for _ in range(max_iter):
+        # Calculer erf(x) et sa dérivée
+        erf_x = np_erf(x)
+        deriv = 2/np.sqrt(np.pi) * np.exp(-x**2)
+
+        # Correction de Newton
+        delta = (erf_x - y) / deriv
+        x -= delta
+
+        # Vérifier convergence
+        if np.all(np.abs(delta) < tol):
+            break
+
+    return x
+
+# Fonction fictive pour l'absorption
 def absorption_fisher_simmons(f, T=25, D=100):
     T_kel = 273.1 + T
     P = D / 10.0
@@ -59,6 +119,304 @@ def absorption_fisher_simmons(f, T=25, D=100):
 
     Alpha = (Boric + MgSO4 + H2O) * 20 * np.log10(np.e)
     return Alpha
+
+
+def circular_arc_length(R, theta_deg):
+    """
+    Calculate the arc length of a circle defined by a radius and an angular opening.
+
+    Args:
+        R (float or np.ndarray): Radius of the circle (in meters or any length unit).
+        theta_deg (float or np.ndarray): Angular opening in degrees.
+
+    Returns:
+        float or np.ndarray: Arc length (in meters or any length unit).
+    """
+    arc_length = 2 * np.pi * R * (theta_deg / 360)
+    return arc_length
+
+
+def spherical_cap_area_vectorized(R, delta_phi_deg, delta_theta_deg):
+    """
+    Calculate the area of spherical caps for vectorized inputs.
+
+    Args:
+        R (np.ndarray): Array of sphere radii (in meters or any length unit).
+        delta_phi_deg (np.ndarray): Array of azimuth (bearing) openings in degrees.
+        delta_theta_deg (np.ndarray): Array of elevation (site) openings in degrees.
+
+    Returns:
+        np.ndarray: Array of spherical cap areas (in m² or any area unit).
+    """
+    # Convert angles from degrees to radians
+    delta_phi_rad = np.radians(delta_phi_deg)
+    delta_theta_rad = np.radians(delta_theta_deg)
+
+    # Approximation for small angles: solid angle Omega ≈ delta_phi * delta_theta
+    omega = delta_phi_rad * delta_theta_rad
+
+    # Area of the spherical caps
+    area = R**2 * omega
+
+    return area
+
+def distance_and_grazing_angle(horizontal_distance, height, angle_in_degrees=True):
+    """
+    Calculate the Euclidean distance and the grazing angle (angle between the sound ray and the boundary).
+
+    Args:
+        horizontal_distance (float or np.ndarray): Horizontal distance (in meters or any length unit).
+        height (float or np.ndarray): Height (in meters or any length unit).
+        angle_in_degrees (bool): If True, returns the grazing angle in degrees. Otherwise, in radians. Default: True.
+
+    Returns:
+        tuple: (euclidean_distance, grazing_angle)
+            - euclidean_distance (float or np.ndarray): Euclidean distance (in meters or any length unit).
+            - grazing_angle (float or np.ndarray): Grazing angle between the sound ray and the boundary (in degrees or radians).
+    """
+    # Euclidean distance
+    euclidean_distance = np.sqrt(horizontal_distance**2 + height**2)
+
+    # Angle between the vertical and the hypotenuse (using arctan2)
+    angle_from_vertical_rad = np.arctan2(horizontal_distance, height)
+
+    # Grazing angle = 90° - angle_from_vertical
+    grazing_angle_rad = (np.pi / 2) - angle_from_vertical_rad
+    grazing_angle = np.degrees(grazing_angle_rad) if angle_in_degrees else grazing_angle_rad
+
+    return euclidean_distance, grazing_angle
+
+
+import numpy as np
+from typing import Union
+
+# --------------------------------------------------------------------
+# Beaufort‑to‑wind‑speed lookup (m/s).  Values are the mid‑points
+# of the standard wind‑speed ranges for each Beaufort number.
+# --------------------------------------------------------------------
+BEAUFORT_WIND_SPEEDS = np.array([
+    0.15,   # 0 – <0.3  m/s   (no wind)
+    1.0,   # 1 – 0.3–1.5 m/s
+    2.4,   # 2 – 1.5–3.3 m/s
+    4.2,   # 3 – 3.3–5.5 m/s
+    6.2,   # 4 – 5.5–7.9 m/s
+    9.0,   # 5 – 7.9–10.7 m/s
+    12.2,  # 6 – 10.7–13.8 m/s
+    15.8,  # 7 – 13.8–17.1 m/s
+    19.4,  # 8 – 17.1–20.8 m/s
+    23.5,  # 9 – 20.8–24.9 m/s
+    28.0,  # 10 – 24.9–29.5 m/s
+    33.5,  # 11 – 29.5–34.5 m/s
+    35.0   # 12 – >34.5  m/s   (take 35 m/s as a typical upper limit)
+])
+
+def beaufort_to_wind(beaufort: Union[int, float, np.ndarray]) -> np.ndarray:
+    """
+    Convert a Beaufort number (or array of numbers) to a wind speed in m/s.
+    Values outside the 0‑12 range are clipped to the nearest valid entry.
+    """
+    bf = np.asarray(beaufort).astype(int)
+    # Clip to 0…12 so that indexing is safe
+    bf = np.clip(bf, 0, BEAUFORT_WIND_SPEEDS.size - 1)
+    return BEAUFORT_WIND_SPEEDS[bf]
+
+# --------------------------------------------------------------------
+# Chapman‑Harris noise model – now takes sea state instead of VVent
+# --------------------------------------------------------------------
+def surface_scattering_strength(
+    angle_rasance: Union[float, np.ndarray, list, tuple],
+    f: Union[np.ndarray, list, tuple],
+    sea_state: Union[int, float, np.ndarray, list, tuple]
+) -> np.ndarray:
+    """
+    Compute noise level (dB) from the Chapman‑Harris formula,
+    but the wind speed is inferred from the sea state (Beaufort).
+
+    Parameters
+    ----------
+    sea_state : array_like
+        Sea‑state number(s) on the Beaufort scale (0–12).  Scalars or
+        arrays of any shape are accepted.
+    f : array_like
+        Frequency vector (row).  Scalars are treated as 1‑element arrays.
+    angle_rasance : array_like or scalar
+        Rake angle(s) in degrees.  Scalars are broadcast to all combinations.
+
+    Returns
+    -------
+    bruit : np.ndarray
+        Noise level(s) in dB for each (sea_state, f) pair.
+    """
+    # 1. Convert sea state → wind speed
+    VVent = beaufort_to_wind(sea_state)          # (n,) or (n,1)
+
+    # 2. Ensure correct shapes for broadcasting
+    VVent = np.asarray(VVent).reshape(-1, 1)      # (n,1)
+    f = np.asarray(f).reshape(1, -1)              # (1,m)
+    angle = np.asarray(angle_rasance)            # scalar or (p,)
+
+    # 3. Compute Beta
+    beta = 158.0 * (VVent * np.power(f, 1.0/3.0)) ** (-0.58)
+
+    # 4. Compute Scatering
+    s = (
+        2.6
+        - 42.4 * np.log10(beta)
+        + 3.3 * beta * np.log10(np.abs(angle[:,np.newaxis]) / 30.0)
+    )
+    #(s.shape)
+    return s
+
+
+def bottom_scattering_strength(
+    angle_deg: Union[float, np.ndarray],
+    f: Union[float, np.ndarray],
+    sediment_type: str = "Sand",
+    flag_rasance: int = 1
+) -> np.ndarray:
+    """
+    Mackinney‑Anderson loss (dB) for a given rake angle and frequency.
+
+    Parameters
+    ----------
+    angle_deg : float or array_like
+        Rake angle(s) in degrees.
+    f : float or array_like
+        Frequency(ies) in hertz (Hz).
+    sediment_type : str, default "Sand"
+        One of: "Rock", "Sand", "Mud".
+    flag_rasance : int, default 1
+        Flag selecting the formula branch (1 or 0).
+
+    Returns
+    -------
+    pertes : np.ndarray
+        Loss in dB, broadcasted to the shape of the inputs.
+    """
+    # ----------------------------------------------------------------------
+    # Mapping from string → integer (original code used 1‑3)
+    SEDIMENT_MAP = {
+        "sand": 1,
+        "mud": 2,
+        "rock": 3
+    }
+
+    # ------------------------------------------------------------------
+    # Convert the sediment string to the integer code used by the model
+    # ------------------------------------------------------------------
+    sed_key = sediment_type.strip().lower()
+    if sed_key not in SEDIMENT_MAP:
+        raise ValueError(
+            f"Unknown sediment_type '{sediment_type}'. "
+            f"Choose one of {list(SEDIMENT_MAP.keys())}."
+        )
+    type_fond = SEDIMENT_MAP[sed_key]
+
+    # ------------------------------------------------------------------
+    # Prepare arrays
+    # ------------------------------------------------------------------
+    angle_deg = np.asarray(angle_deg, dtype=float)
+    f = np.asarray(f, dtype=float)
+
+    f_khz = f / 1e3                     # convert to kHz
+
+    # Helper trigonometric functions (degrees → radians)
+    tan_deg = np.tan(np.radians(angle_deg))
+    sin_deg = np.sin(np.radians(angle_deg))
+    cos_deg = np.cos(np.radians(angle_deg))
+
+    # ------------------------------------------------------------------
+    # Main computation
+    # ------------------------------------------------------------------
+    if flag_rasance:
+        # ----- Branch 1 (flag_rasance == 1) ----------------------------
+        B = 1 + 125 * np.exp(
+            -2.64 * (type_fond - 1.75) ** 2
+            - 50 / (type_fond * tan_deg ** 2)
+        )
+        C = B * np.power(
+            sin_deg + 0.19,
+            (cos_deg ** 16)* f_khz[:,np.newaxis]
+        )
+        bs = 10 * np.log10(
+            2.53 * C * f_khz[:,np.newaxis] ** (3.2 - 0.8 * type_fond)
+            * 10 ** (2.8 * type_fond - 12)
+            + 10 ** (-4.5)
+        )
+    else:
+        # ----- Branch 2 (flag_rasance == 0) ----------------------------
+        # Adjust the angle as in the original code
+        angle_deg = 90.0 - angle_deg
+        tan_deg = np.tan(np.radians(angle_deg))
+        sin_deg = np.sin(np.radians(angle_deg))
+        cos_deg = np.cos(np.radians(angle_deg))
+
+        B = 1 + 125 * np.exp(
+            -2.64 * (type_fond - 1.75) ** 2
+            - (50 * tan_deg ** 2) / type_fond
+        )
+        C = B * np.power(
+            cos_deg + 0.19,
+            f_khz * (sin_deg ** 16)
+        )
+        bs = 10 * np.log10(
+            2.53 * C * f_khz ** (3.2 - 0.8 * type_fond)
+            * 10 ** (2.8 * type_fond - 12)
+            + 10 ** (-4.5)
+        )
+    bs = bs.T
+    #print(bs.shape)
+    return bs
+
+def volume_scattering_strength(
+    frequency_hz,
+    turbidity="Moderate",
+    scatterer_density=1.0,
+):
+    """
+    Estimate the volume scattering strength (in dB/m) based on frequency and water turbidity.
+
+    Args:
+        frequency_hz (float or np.ndarray): Frequency in Hz.
+        turbidity (str): Turbidity level ("Clear", "Moderate", "Turbid", or "VeryTurbid").
+                        Default: "Moderate".
+        scatterer_density (float): Relative density of scatterers (1.0 = typical). Default: 1.0.
+
+    Returns:
+        float or np.ndarray: Volume scattering strength in dB/m.
+
+    Raises:
+        ValueError: If turbidity is not one of the supported levels.
+    """
+    # Define empirical models for each turbidity level
+    turbidity_models = {
+        "Clear": {
+            # Low scattering due to minimal suspended particles
+            "formula": lambda f: -90*np.ones(f.shape),# + 5 * np.log10(f) + 10 * np.log10(scatterer_density),
+        },
+        "Moderate": {
+            # Typical scattering for coastal or open ocean waters
+            "formula": lambda f: -70*np.ones(f.shape),# + 15 * np.log10(f) + 10 * np.log10(scatterer_density),
+        },
+        "Turbid": {
+            # High scattering due to suspended sediments or high biological activity
+            "formula": lambda f: -50*np.ones(f.shape),# + 25 * np.log10(f) + 10 * np.log10(scatterer_density),
+        },
+        "VeryTurbid": {
+            # Very high scattering due to extreme turbidity (e.g., near river deltas or after storms)
+            "formula": lambda f: -30*np.ones(f.shape),# + 35 * np.log10(f) + 10 * np.log10(scatterer_density),
+        }
+    }
+
+    # Check if turbidity is valid
+    if turbidity not in turbidity_models:
+        raise ValueError("turbidity must be 'Clear', 'Moderate', 'Turbid', or 'VeryTurbid'.")
+
+    # Get the formula for the specified turbidity level
+    model = turbidity_models[turbidity]
+    volume_scattering_db = model["formula"](frequency_hz)
+
+    return volume_scattering_db
 
 
 def calculate_nl(f_sea_state, f_noise, f_margin_shallow_water=0):
@@ -104,13 +462,14 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.LeftDockWidgetArea, dock_config)
 
         config_widget = QWidget()
-        config_layout = QVBoxLayout()
+        config_layout = QGridLayout()
 
         self.spinboxes = {
             'Fmin': QDoubleSpinBox(),
             'Fmax': QDoubleSpinBox(),
             'SL': QDoubleSpinBox(),
             'SH': QDoubleSpinBox(),
+            'Ne': QDoubleSpinBox(),
             'B': QDoubleSpinBox(),
             'DI': QDoubleSpinBox(),
             'T': QDoubleSpinBox(),
@@ -120,7 +479,13 @@ class MainWindow(QMainWindow):
             'Depth': QDoubleSpinBox(),
             'Temp': QDoubleSpinBox(),
             'DT': QDoubleSpinBox(),
-            'PFA': QDoubleSpinBox()
+            'PFA': QDoubleSpinBox(),
+            'Bottom': QDoubleSpinBox(),
+            'BearingAperture': QDoubleSpinBox(),
+            'ElevationAperture': QDoubleSpinBox(),
+            'TS': QDoubleSpinBox(),
+            'C': QDoubleSpinBox(),
+            'NbCell': QDoubleSpinBox(),
         }
 
         self.spinboxes['Fmin'].setRange(100, 1000000)
@@ -138,6 +503,10 @@ class MainWindow(QMainWindow):
         self.spinboxes['SH'].setRange(-220, -150)
         self.spinboxes['SH'].setSuffix(' dBV/uPa')
         self.spinboxes['SH'].setValue(self.args.SH)
+
+        self.spinboxes['Ne'].setRange(1, 200)
+        self.spinboxes['Ne'].setSuffix(' nV/sqrt(Hz)')
+        self.spinboxes['Ne'].setValue(self.args.Ne)
 
         self.spinboxes['B'].setRange(0.01, 50000)
         self.spinboxes['B'].setSuffix(' Hz')
@@ -179,17 +548,67 @@ class MainWindow(QMainWindow):
         self.spinboxes['Temp'].setSuffix(' degC')
         self.spinboxes['Temp'].setValue(self.args.Temp)
 
-        for name, spinbox in self.spinboxes.items():
-            config_layout.addWidget(QLabel(name))
-            config_layout.addWidget(spinbox)
-            spinbox.valueChanged.connect(self.update_plots)
+        self.spinboxes['BearingAperture'].setRange(1, 360)
+        self.spinboxes['BearingAperture'].setSuffix(' deg')
+        self.spinboxes['BearingAperture'].setValue(self.args.BearingAperture)
 
+        self.spinboxes['ElevationAperture'].setRange(1, 360)
+        self.spinboxes['ElevationAperture'].setSuffix(' deg')
+        self.spinboxes['ElevationAperture'].setValue(self.args.ElevationAperture)
+
+        self.spinboxes['TS'].setRange(-50, 50)
+        self.spinboxes['TS'].setSuffix(' dB')
+        self.spinboxes['TS'].setValue(self.args.TS)
+
+        self.spinboxes['NbCell'].setRange(1, 100)
+        self.spinboxes['NbCell'].setSuffix(' dB')
+        self.spinboxes['NbCell'].setValue(self.args.NbCell)
+
+        self.spinboxes['Bottom'].setRange(0, 10000)
+        self.spinboxes['Bottom'].setSuffix(' m')
+        self.spinboxes['Bottom'].setValue(self.args.Bottom)
+
+        self.spinboxes['C'].setRange(1300, 1600)
+        self.spinboxes['C'].setSuffix(' m/s')
+        self.spinboxes['C'].setValue(self.args.C)
+
+        row = 0
+        self.sonar_type = QComboBox()
+        self.sonar_type.addItems(['Passive', 'Active'])
+        self.sonar_type.currentTextChanged.connect(self.update_plots)
+        config_layout.addWidget(QLabel('SonarType'), row, 0)
+        self.sonar_type.setCurrentText(self.args.SonarType)
+        config_layout.addWidget(self.sonar_type, row, 1)
+
+        row += 1
         self.combo_type = QComboBox()
         self.combo_type.addItems(['Incoherent', 'Coherent'])
         self.combo_type.currentTextChanged.connect(self.update_plots)
-        config_layout.addWidget(QLabel('TypeTraitement'))
-        self.combo_type.setCurrentText(self.args.TypeTraitement)
-        config_layout.addWidget(self.combo_type)
+        config_layout.addWidget(QLabel('ProcessingType'), row, 0)
+        self.combo_type.setCurrentText(self.args.ProcessingType)
+        config_layout.addWidget(self.combo_type, row, 1)
+
+        for name, spinbox in self.spinboxes.items():
+            row += 1
+            config_layout.addWidget(QLabel(name), row, 0)
+            config_layout.addWidget(spinbox, row, 1)
+            spinbox.valueChanged.connect(self.update_plots)
+
+        row += 1
+        self.seabed_type = QComboBox()
+        self.seabed_type.addItems(['Rock', 'Sand', 'Mud'])
+        self.seabed_type.currentTextChanged.connect(self.update_plots)
+        config_layout.addWidget(QLabel('SeabedType'), row, 0)
+        self.seabed_type.setCurrentText(self.args.SeabedType)
+        config_layout.addWidget(self.seabed_type, row, 1)
+
+        row += 1
+        self.turbidity = QComboBox()
+        self.turbidity.addItems(["Clear", "Moderate", "Turbid", "VeryTurbid"])
+        self.turbidity.currentTextChanged.connect(self.update_plots)
+        config_layout.addWidget(QLabel('Turbidity'), row, 0)
+        self.turbidity.setCurrentText(self.args.Turbidity)
+        config_layout.addWidget(self.turbidity, row, 1)
 
         config_widget.setLayout(config_layout)
 
@@ -199,7 +618,7 @@ class MainWindow(QMainWindow):
         scroll_area.setWidget(config_widget)
         scroll_area.setWidgetResizable(True)
         dock_config.setWidget(scroll_area)
-        scroll_area.setMaximumWidth(200)
+        scroll_area.setMaximumWidth(300)
 
 
         # Dock pour les plots ES
@@ -244,6 +663,20 @@ class MainWindow(QMainWindow):
         cp_widget.setLayout(cp_layout)
         dock_cp.setWidget(cp_widget)
 
+        # Dock pour le plot Noises
+        dock_noise = QDockWidget('Plot Noises', self)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock_noise)
+
+        noise_widget = QWidget()
+        noise_layout = QVBoxLayout()
+
+        self.figure_noise = Figure()
+        self.canvas_noise = FigureCanvas(self.figure_noise)
+        noise_layout.addWidget(self.canvas_noise)
+
+        noise_widget.setLayout(noise_layout)
+        dock_noise.setWidget(noise_widget)
+
         # Dock pour le plot SH
         dock_v = QDockWidget('Plot Tension', self)
         self.addDockWidget(Qt.RightDockWidgetArea, dock_v)
@@ -287,6 +720,49 @@ class MainWindow(QMainWindow):
         bargraph_A_widget.setLayout(bargraph_A_layout)
         dock_bargraph_A.setWidget(bargraph_A_widget)
 
+        # Dock pour le plot Scattering en fonction de l'angle
+        dock_scattering_surface = QDockWidget('Scattering Surface', self)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock_scattering_surface)
+
+        scattering_surface_widget = QWidget()
+        scattering_surface_layout = QVBoxLayout()
+
+        self.figure_scattering_surface = Figure()
+        self.canvas_scattering_surface = FigureCanvas(self.figure_scattering_surface)
+        scattering_surface_layout.addWidget(self.canvas_scattering_surface)
+
+        scattering_surface_widget.setLayout(scattering_surface_layout)
+        dock_scattering_surface.setWidget(scattering_surface_widget)
+
+        # Dock pour le plot Scattering en fonction de l'angle
+        dock_scattering_bottom = QDockWidget('Scattering bottom', self)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock_scattering_bottom)
+
+        scattering_bottom_widget = QWidget()
+        scattering_bottom_layout = QVBoxLayout()
+
+        self.figure_scattering_bottom = Figure()
+        self.canvas_scattering_bottom = FigureCanvas(self.figure_scattering_bottom)
+        scattering_bottom_layout.addWidget(self.canvas_scattering_bottom)
+
+        scattering_bottom_widget.setLayout(scattering_bottom_layout)
+        dock_scattering_bottom.setWidget(scattering_bottom_widget)
+
+
+        # Dock pour le bar graph de N en fonction de f
+        dock_bargraph_VS = QDockWidget('Volume Scattering', self)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock_bargraph_VS)
+
+        bargraph_VS_widget = QWidget()
+        bargraph_VS_layout = QVBoxLayout()
+
+        self.figure_bargraph_VS= Figure()
+        self.canvas_bargraph_VS = FigureCanvas(self.figure_bargraph_VS)
+        bargraph_VS_layout.addWidget(self.canvas_bargraph_VS)
+
+        bargraph_VS_widget.setLayout(bargraph_VS_layout)
+        dock_bargraph_VS.setWidget(bargraph_VS_widget)
+
         # Create a QDockWidget
         dock_about = QDockWidget("About SORAPS", self)
         dock_about.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -312,8 +788,12 @@ class MainWindow(QMainWindow):
 
         self.tabifyDockWidget(dock_about, dock_bargraph_N)
         self.tabifyDockWidget(dock_bargraph_N, dock_bargraph_A)
-        self.tabifyDockWidget(dock_bargraph_A, dock_v)
-        self.tabifyDockWidget(dock_v, dock_cp)
+        self.tabifyDockWidget(dock_bargraph_A, dock_bargraph_VS)
+        self.tabifyDockWidget(dock_bargraph_VS, dock_scattering_surface)
+        self.tabifyDockWidget(dock_scattering_surface, dock_scattering_bottom)
+        self.tabifyDockWidget(dock_scattering_bottom, dock_v)
+        self.tabifyDockWidget(dock_v, dock_noise)
+        self.tabifyDockWidget(dock_noise, dock_cp)
         self.tabifyDockWidget(dock_cp, dock_pod)
         self.tabifyDockWidget(dock_pod, dock_es)
 
@@ -338,10 +818,22 @@ class MainWindow(QMainWindow):
         Dmax = self.spinboxes['Dmax'].value()
         DT = self.spinboxes['DT'].value()
         SH = self.spinboxes['SH'].value()
+        Ne = 20*np.log10(self.spinboxes['Ne'].value()*1e-9)
         Depth = self.spinboxes['Depth'].value()
         Temp = self.spinboxes['Temp'].value()
         Pfa = self.spinboxes['PFA'].value()
         SeaState = self.spinboxes['SeaState'].value()
+        BearingAperture = self.spinboxes['BearingAperture'].value()
+        ElevationAperture = self.spinboxes['ElevationAperture'].value()
+        ProcessingType = self.combo_type.currentText()
+        SonarType = self.sonar_type.currentText()
+        Turbidity = self.turbidity.currentText()
+        SeaBedType = self.seabed_type.currentText()
+        C = self.spinboxes['C'].value()
+        Bottom = self.spinboxes['Bottom'].value()
+        TS = self.spinboxes['TS'].value()
+        K = self.spinboxes['NbCell'].value()
+
 
         d = np.arange(Dmin, Dmax + 1, 1)
         f = np.transpose(np.array([Fmin, (Fmin + Fmax) / 2, Fmax]))
@@ -349,10 +841,10 @@ class MainWindow(QMainWindow):
         Pfa_ = math.pow(10, Pfa)
 
 
-        # Calculate the noise level (N) based on the sea state and frequency
+        # Calculate the noise level (Na) based on the sea state and frequency
         # SeaState: Represents the condition of the sea, affecting ambient noise levels
         # f: Frequency at which the noise level is calculated
-        N = calculate_nl(SeaState, f)
+        Na = calculate_nl(SeaState, f)
 
         # Calculate the absorption coefficient (alpha) using the Fisher-Simmons model
         # This model estimates sound absorption in seawater based on frequency, depth, and temperature
@@ -361,45 +853,134 @@ class MainWindow(QMainWindow):
         # T: Temperature of the water, set to the variable Temp
         alpha = absorption_fisher_simmons(f, D=Depth, T=Temp)
 
-        # CP: Computation of Propagation Loss
+        # CP: Computation of    
         # This line calculates the propagation loss (CP) which includes spherical spreading loss and absorption loss.
         # 20 * np.log10(d[:, np.newaxis]) represents spherical spreading loss.
         # alpha * d[:, np.newaxis] represents absorption loss, where alpha is the absorption coefficient.
-        CP = 20 * np.log10(d[:, np.newaxis]) + alpha * d[:, np.newaxis]
+        
+
+        #print(SonarType)
+        if SonarType == 'Active':
+            CP = 2.0*(20.0 * np.log10(d[:, np.newaxis]) + alpha * d[:, np.newaxis])
+
+            Resolution = C/(2*B)
+            distance_surface, grazing_angle_deg_suface = distance_and_grazing_angle(d, Depth)
+            distance_seabed, grazing_angle_deg_seabed = distance_and_grazing_angle(d, Bottom-Depth)
+
+            A_surface = Resolution*circular_arc_length(
+                d, 
+                BearingAperture)
+
+            A_seabed = Resolution*circular_arc_length(
+                d, 
+                BearingAperture)
+
+            V = Resolution*spherical_cap_area_vectorized(
+                d, 
+                BearingAperture, 
+                ElevationAperture)
+
+            volume_scattering = volume_scattering_strength(f,turbidity=Turbidity)
+            seabed_scattering = bottom_scattering_strength(
+                grazing_angle_deg_seabed,
+                f,
+                sediment_type=SeaBedType,
+            )
+            surface_scattering = surface_scattering_strength(
+                grazing_angle_deg_suface,
+                f, 
+                sea_state=SeaState)
+            print('V',volume_scattering)
+            print('SS',surface_scattering)
+            print('BS',seabed_scattering)
+            Nr_seabed = SL - CP + 10*np.log10(A_seabed[:,np.newaxis])+(seabed_scattering)
+            Nr_surface =  SL - CP + 10*np.log10(A_surface[:,np.newaxis])+(surface_scattering)
+            Nv =  SL - CP + 10*np.log10(V[:,np.newaxis])+(volume_scattering)
+            print('V',Nv)
+            print('SS',Nr_surface)
+            print('BS',Nr_seabed)
+            
+           
+            #Nt = 10*np.log10(np.pow(10.0,(Ne - SH - 10.0 * np.log10(T))/10) + np.pow(10.0,(Na - DI - 10.0 * np.log10(T))/10) + np.pow(10.0,(Nr_seabed)/10) + np.pow(10.0,(Nr_surface)/10) + np.pow(10.0,(Nv)/10))- 10*np.log10((2*K)/(K+1))
+            Nte = Ne - SH - DI - 10.0 * np.log10(T) - 10*np.log10((2*K)/(K+1))
+            Nte = Nte*np.ones(CP.shape)
+
+            Nta = Na - DI - 10.0 * np.log10(T) - 10*np.log10((2*K)/(K+1))
+            Nta = Nta[np.newaxis,:]*np.ones(CP.shape)
+
+            Ntrv = Nv - 10*np.log10((2*K)/(K+1))
+            Ntrss = Nr_surface - 10*np.log10((2*K)/(K+1))
+            Ntrbs = Nr_seabed - 10*np.log10((2*K)/(K+1))
+
+            Nt = 10.0*np.log10(np.pow(10.0,Nta/10.0) + np.pow(10.0,Nte/10.0) + np.pow(10.0,Ntrv/10.0) + np.pow(10.0,Ntrss/10.0) + np.pow(10.0,Ntrbs/10.0))
+            print(Nt[0,0])
+            print(Nta[0,0], Na, DI)
+            print(Nte[0,0], Ne, SH)
+            print(Ntrv[0,0])
+            print(Ntrss[0,0])
+            print(Ntrbs[0,0])
+            
+           
+
+            if not ProcessingType == "Coherent":
+                print("Incoherent processing is not supported")
+
+
+        else:
+            CP = 20 * np.log10(d[:, np.newaxis]) + alpha * d[:, np.newaxis]
+            
+            if ProcessingType == "Coherent":
+
+                Nta = Na - DI + 10.0 * np.log10(B) - 10.0 * np.log10(T*B) - 10*np.log10((2*K)/(K+1))
+                Nte = Ne - SH + 10.0 * np.log10(B) - 10.0 * np.log10(T*B) - 10*np.log10((2*K)/(K+1))
+        
+            else:
+                K = B*T
+                Nta = Na - DI + 10.0 * np.log10(B) -                    0 - 10*np.log10((2*K)/(K+1))
+                Nte = Ne - SH + 10.0 * np.log10(B) -                    0 - 10*np.log10((2*K)/(K+1))
+        
+            Nt = 10*np.log10(pow(10.0,Nta/10) + np.pow(10.0,Nte/10))
 
         # V: Voltage or signal level after propagation
         # This line calculates the voltage or signal level (V) at the receiver.
         # SL is the Source Level, CP is the Propagation Loss, and SH is the Signal Excess or Hydrophone Sensitivity.
-        V = 10.0**((SL - CP + SH)/20)
+        V = np.pow(10,(SL - CP + SH)/20)
 
         # ES: Signal Excess for Coherent and Incoherent Processing
         # Depending on the type of processing (Coherent or Incoherent), the Signal Excess (ES) is calculated differently.
-        if self.combo_type.currentText() == 'Coherent':
-            # For Coherent processing, the Signal Excess includes terms for Bandwidth (B) and Integration Time (T).
-            ES = SL - CP + 10.0 * np.log10(B) + 10.0 * np.log10(T) - (N - DI) - 10.0 * np.log10(B) - DT
-            E_N = (N - DI) - 10.0 * np.log10(T)
-        else:# self.combo_type.currentText() == 'Incoherent':
-            # For Incoherent processing, the Signal Excess calculation is slightly different.
-            ES = SL - CP + 10.0 * np.log10(T) - (N-DI) - 10.0 * np.log10(B) - DT
-            E_N = (N - DI) - 10.0 * np.log10(T) + 10.0 * np.log10(B)
-
-        # Convert ES and E_N from dB to linear scale
-        E_S = 10.**((SL - CP)/10);
-        E_N = 10.**(E_N/10);
-
-
-        # Calculate detection threshold (dt_s) based on the noise level and probability of false alarm
-        dt_s= E_N *np.sqrt(-np.log(Pfa_));
+        E_N_post = 10.**((Nt)/10);
+        Gain=(2*K)/(K+1)
+        E_N = E_N_post*Gain;
+        E_Smin=np.pow(10,(DT/10))*E_N_post;
         
-        # This uses the error function to compute the probability of detection based on the detection threshold, signal excess, and noise level.
-        POD = 0.5 - np_erf((dt_s - E_S) / (np.sqrt(2) * E_N)) / 2
+        # Calculate detection threshold (dt_s) based on the noise level and probability of false alarm of quadratic detector
+        if K == 1:
+            dt_s= E_N *(-np.log(Pfa_));
+        else:
+            dt_s=(np.sqrt(2)*E_N*inverse_erf(1-2*Pfa_)+E_N*np.sqrt(K))/np.sqrt(K);
 
+        E_S = np.pow(10,(SL - CP + TS)/10);
+        
+        DT_db=(10*np.log10(E_Smin/E_N_post));
+        
+        SNR_db =(10*np.log10(E_S/E_N_post));
+
+        ES_db = SNR_db - DT_db;
+        
+        # Probability of detection
+        if K == 1:
+            S_s = np.sqrt(E_N);
+            POD_o=1-(np_erf((np.sqrt(dt_s*dt_s)+E_S)/(np.sqrt(2)*S_s*S_s))+np_erf((np.sqrt(dt_s*dt_s)-E_S)/(np.sqrt(2)*S_s*S_s)))/2;
+        else:
+            S_n = E_N;
+            POD_o=1/2-np_erf((np.sqrt(K)*(dt_s-E_S))/(np.sqrt(2)*S_n))/2;
+        
         # Plot POD
         self.figure_pod.clear()
         ax = self.figure_pod.add_subplot(111)
-        ax.plot(d, POD[:, 0], label='Fmin', color='blue')
-        ax.plot(d, POD[:, 1], label='Fmoy', color='gray', linestyle='dotted')
-        ax.plot(d, POD[:, 2], label='Fmax', color='red')
+        ax.plot(d, POD_o[:, 0], label='Fmin', color='blue')
+        ax.plot(d, POD_o[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax.plot(d, POD_o[:, 2], label='Fmax', color='red')
         ax.grid()
         ax.legend()
         ax.set_xlabel('Distance (m)')
@@ -411,9 +992,9 @@ class MainWindow(QMainWindow):
         # Plot ES
         self.figure_es.clear()
         ax = self.figure_es.add_subplot(111)
-        ax.plot(d, ES[:, 0], label='Fmin', color='blue')
-        ax.plot(d, ES[:, 1], label='Fmoy', color='gray', linestyle='dotted')
-        ax.plot(d, ES[:, 2], label='Fmax', color='red')
+        ax.plot(d, ES_db[:, 0], label='Fmin', color='blue')
+        ax.plot(d, ES_db[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax.plot(d, ES_db[:, 2], label='Fmax', color='red')
         ax.grid()
         ax.legend()
         ax.set_xlabel('Distance (m)')
@@ -430,9 +1011,63 @@ class MainWindow(QMainWindow):
         ax_cp.legend()
         ax_cp.grid()
         ax_cp.set_xlabel('Distance (m)')
-        ax_cp.set_ylabel('Champ de perte (dB)')
-        ax_cp.set_title(f'Champ de perte')
+        ax_cp.set_ylabel('Field of loss (dB)')
+        ax_cp.set_title(f'Field of loss')
         self.canvas_cp.draw()
+
+        # Plot N
+        #print(Nt.shape)
+        #print(Nta.shape)
+        #Ntap = Nta[np.newaxis, :]*np.ones(Nt.shape)
+        #Ntep = Nte*np.ones(Nt.shape)
+        #print(Ntap.shape)
+        #print(Ntrv.shape)
+        #print(Ntrss.shape)
+        #print(Ntrbs.shape)
+        self.figure_noise.clear()
+        ax_noise = self.figure_noise.add_subplot(111)
+
+        if SonarType == 'Active':
+            ax_noise.plot(d, Nt[:, 0], label='Total Fmin', color='blue')
+            ax_noise.plot(d, Nt[:, 1], label='Total Fmoy', color='blue', linestyle='dotted')
+            ax_noise.plot(d, Nt[:, 2], label='Total Fmax', color='blue', linestyle='dashdot')
+
+            ax_noise.plot(d, Nte[:, 1], label='Electronic', color='gray')
+
+            ax_noise.plot(d, Nta[:, 0], label='Ambiant Fmin', color='red')
+            ax_noise.plot(d, Nta[:, 1], label='Ambiant Fmoy', color='red', linestyle='dotted')
+            ax_noise.plot(d, Nta[:, 2], label='Ambiant Fmax', color='red', linestyle='dashdot')
+
+
+            ax_noise.plot(d, Ntrv[:, 0], label='Volume Fmin', color='green')
+            ax_noise.plot(d, Ntrv[:, 1], label='Volume Fmoy', color='green', linestyle='dotted')
+            ax_noise.plot(d, Ntrv[:, 2], label='Volume Fmax', color='green', linestyle='dashdot')
+
+            ax_noise.plot(d, Ntrss[:, 0], label='Surface Fmin', color='orange')
+            ax_noise.plot(d, Ntrss[:, 1], label='Surface Fmoy', color='orange', linestyle='dotted')
+            ax_noise.plot(d, Ntrss[:, 2], label='Surface Fmax', color='orange', linestyle='dashdot')
+
+            ax_noise.plot(d, Ntrbs[:, 0], label='Bottom Fmin', color='purple')
+            ax_noise.plot(d, Ntrbs[:, 1], label='Bottom Fmoy', color='purple', linestyle='dotted')
+            ax_noise.plot(d, Ntrbs[:, 2], label='Bottom Fmax', color='purple', linestyle='dashdot')
+
+            ax_noise.legend()
+            ax_noise.grid()
+            ax_noise.set_xlabel('Distance (m)')
+            ax_noise.set_ylabel('Noise (dBuPa)')
+            ax_noise.set_title(f'Noise')
+        else:
+            ax_noise.bar(['Total Fmin','Total Fmoy','Total Fmax', 'Ambiant Fmin','Ambiant Fmoy','Ambiant Fmax', 'Electronic'], [Nt[0], Nt[1], Nt[2], Nta[0], Nta[1], Nta[2], Nte], color=['blue','blue','blue', 'red', 'red', 'red', 'gray'])
+            #print(Nta.shape)
+            #print(Nt.shape)
+            #print(Nte.shape)
+            #ax_noise.bar(['Fmin','Fmoy','Fmax'], Nta, color='red')
+            ax_noise.set_xlabel('Frequency (Hz)')
+            ax_noise.set_ylabel('Noise Total (dBuPa/sqrt(Hz))')
+            ax_noise.set_title(f'Total Noise over Bandwidth - SeaState:{SeaState} - Nte:{Nte}')
+            ax_noise.grid(axis='y')
+
+        self.canvas_noise.draw()
 
         # Plot SH
         self.figure_sh.clear()
@@ -450,25 +1085,64 @@ class MainWindow(QMainWindow):
         # Bar Graph N vs f
         self.figure_bargraph_N.clear()
         ax_bargraph_N = self.figure_bargraph_N.add_subplot(111)
-        ax_bargraph_N.bar(['Fmin','Fmoy','Fmax'], N, color='blue')
+        ax_bargraph_N.bar(['Fmin','Fmoy','Fmax'], Na, color=['blue','gray','red'])
         ax_bargraph_N.set_xlabel('Frequency (Hz)')
         ax_bargraph_N.set_ylabel('N (dBuPa/sqrt(Hz))')
-        ax_bargraph_N.set_title(f'Noise over Bandwidth - SeaState:{SeaState}')
+        ax_bargraph_N.set_title(f'Ambiant Noise over Bandwidth - SeaState:{SeaState}')
 
         ax_bargraph_N.grid(axis='y')
         self.canvas_bargraph_N.draw()
 
+        VS = volume_scattering_strength(f,turbidity=Turbidity)
+        self.figure_bargraph_VS.clear()
+        ax_bargraph_VS = self.figure_bargraph_VS.add_subplot(111)
+        ax_bargraph_VS.bar(['Fmin','Fmoy','Fmax'], VS, color=['blue','gray','red'])
+        ax_bargraph_VS.set_xlabel('Frequency (Hz)')
+        ax_bargraph_VS.set_ylabel('(dB)')
+        ax_bargraph_VS.set_title(f'Volume Scattering over Bandwidth - SeaType:{SeaBedType}')
+
+        ax_bargraph_VS.grid(axis='y')
+        self.canvas_bargraph_VS.draw()
+
         # Bar Graph N vs f
         self.figure_bargraph_A.clear()
         ax_bargraph_A = self.figure_bargraph_A.add_subplot(111)
-        ax_bargraph_A.bar(['Fmin','Fmoy','Fmax'], alpha, color='blue')
+        ax_bargraph_A.bar(['Fmin','Fmoy','Fmax'], alpha, color=['blue','gray','red'])
         ax_bargraph_A.set_xlabel('Frequency (Hz)')
         ax_bargraph_A.set_ylabel('absorption db/m')
         ax_bargraph_A.set_title(f'Absorption over Bandwidth - T:{Temp} - D:{Depth}')
         ax_bargraph_A.grid(axis='y')
         self.canvas_bargraph_A.draw()
 
+        # Plot Scattering
+        angles_deg  = np.linspace(0, 90, 90)
+        SS = surface_scattering_strength(angles_deg,f,SeaState)
+        
+        self.figure_scattering_surface.clear()
+        ax_scattering_surface = self.figure_scattering_surface.add_subplot(111)
+        ax_scattering_surface.plot(angles_deg, SS[:, 0], label='Fmin', color='blue')
+        ax_scattering_surface.plot(angles_deg, SS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax_scattering_surface.plot(angles_deg, SS[:, 2], label='Fmax', color='red')
+        ax_scattering_surface.legend()
+        ax_scattering_surface.grid()
+        ax_scattering_surface.set_xlabel('Angle (deg)')
+        ax_scattering_surface.set_ylabel('dB')
+        ax_scattering_surface.set_title(f'Surface scattering')
+        self.canvas_scattering_surface.draw()
 
+        BS = bottom_scattering_strength(angles_deg,f,SeaBedType)
+        #print(BS)
+        self.figure_scattering_bottom.clear()
+        ax_scattering_bottom = self.figure_scattering_bottom.add_subplot(111)
+        ax_scattering_bottom.plot(angles_deg, BS[:, 0], label='Fmin', color='blue')
+        ax_scattering_bottom.plot(angles_deg, BS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
+        ax_scattering_bottom.plot(angles_deg, BS[:, 2], label='Fmax', color='red')
+        ax_scattering_bottom.legend()
+        ax_scattering_bottom.grid()
+        ax_scattering_bottom.set_xlabel('Angle (deg)')
+        ax_scattering_bottom.set_ylabel('dB')
+        ax_scattering_bottom.set_title(f'Bottom scattering')
+        self.canvas_scattering_bottom.draw()
 
         #print('--- END UPDATE PLOTS')
 
@@ -493,10 +1167,13 @@ class MainWindow(QMainWindow):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Mini-Soraps')
+    parser.add_argument('--SonarType', type=str, choices=["Active", "Passive"], default='Active', help='Type of sonar')
+    parser.add_argument('--ProcessingType', type=str, choices=['Incoherent', 'Coherent'], default='Coherent', help='Type of treatment')
     parser.add_argument('--Fmin', type=float, default=10000, help='Fmin value (Hz)')
     parser.add_argument('--Fmax', type=float, default=20000, help='Fmax value (Hz)')
     parser.add_argument('--SL', type=float, default=150, help='SL value (dBuPa)')
-    parser.add_argument('--SH', type=float, default=-200, help='SH value (dBV/uPa)')
+    parser.add_argument('--SH', type=float, default=-180, help='SH value (dBV/uPa)')
+    parser.add_argument('--Ne', type=float, default=10, help='Electronic noise (nV/sqrt(Hz))')
     parser.add_argument('--B', type=float, default=500, help='B value (Hz)')
     parser.add_argument('--DI', type=float, default=0, help='DI value (dB)')
     parser.add_argument('--T', type=float, default=0.01, help='T value (s)')
@@ -504,10 +1181,17 @@ def parse_arguments():
     parser.add_argument('--Dmax', type=float, default=3000, help='Dmax value (m)')
     parser.add_argument('--DT', type=float, default=0, help='DT value (dB)')
     parser.add_argument('--PFA', type=float, default=-7, help='PFA value (10**)')
+    parser.add_argument('--NbCell', type=float, default=1, help='Number of cells intergrated')
     parser.add_argument('--SeaState', type=int, default=1, help='SeaState value (0-6)')
     parser.add_argument('--Temp', type=float, default=15, help='Temp value (degC)')
-    parser.add_argument('--Depth', type=float, default=100, help='Depth value (m)')
-    parser.add_argument('--TypeTraitement', type=str, choices=['Incoherent', 'Coherent'], default='Coherent', help='Type of treatment')
+    parser.add_argument('--Depth', type=float, default=100, help='Depth of sonar (m)')
+    parser.add_argument('--C', type=float, default=1500, help='Sound Velocity (m/s) - Active only')
+    parser.add_argument('--Bottom', type=float, default=1000, help='Seabed Depth value (m) - Active only')
+    parser.add_argument('--BearingAperture', type=float, default=360, help='Bearing Aperture (deg) - Active only')
+    parser.add_argument('--ElevationAperture', type=float, default=180, help='Elevation Aperture (deg) - Active only')
+    parser.add_argument('--TS', type=float, default=0, help='Target Strength value (dB) - Active only')
+    parser.add_argument('--Turbidity', type=str, choices=["Clear", "Moderate", "Turbid", "VeryTurbid"], default='Clear', help='Type of tubidity - Active only')
+    parser.add_argument('--SeabedType', type=str, choices=["Rock", "Sand", "Mud"], default='Rock', help='Type of seabed - Active only')
     parser.add_argument('--save', action='store_true', default=False, help='Save and Exit')
     return parser.parse_args()
 
