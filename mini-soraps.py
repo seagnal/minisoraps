@@ -620,6 +620,7 @@ class MainWindow(QMainWindow):
         dock_config.setWidget(scroll_area)
         scroll_area.setMaximumWidth(300)
 
+        figsize=(6, 6)
 
         # Dock pour les plots ES
         dock_es = QDockWidget('Plots ES', self)
@@ -628,7 +629,7 @@ class MainWindow(QMainWindow):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
 
-        self.figure_es = Figure()
+        self.figure_es = Figure(figsize=figsize)
         self.canvas_es = FigureCanvas(self.figure_es)
         plot_layout.addWidget(self.canvas_es)
 
@@ -642,7 +643,7 @@ class MainWindow(QMainWindow):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
 
-        self.figure_pod = Figure()
+        self.figure_pod = Figure(figsize=figsize)
         self.canvas_pod = FigureCanvas(self.figure_pod)
         plot_layout.addWidget(self.canvas_pod)
 
@@ -656,7 +657,7 @@ class MainWindow(QMainWindow):
         cp_widget = QWidget()
         cp_layout = QVBoxLayout()
 
-        self.figure_cp = Figure()
+        self.figure_cp = Figure(figsize=figsize)
         self.canvas_cp = FigureCanvas(self.figure_cp)
         cp_layout.addWidget(self.canvas_cp)
 
@@ -670,7 +671,7 @@ class MainWindow(QMainWindow):
         noise_widget = QWidget()
         noise_layout = QVBoxLayout()
 
-        self.figure_noise = Figure()
+        self.figure_noise = Figure(figsize=figsize)
         self.canvas_noise = FigureCanvas(self.figure_noise)
         noise_layout.addWidget(self.canvas_noise)
 
@@ -684,7 +685,7 @@ class MainWindow(QMainWindow):
         sh_widget = QWidget()
         sh_layout = QVBoxLayout()
 
-        self.figure_sh = Figure()
+        self.figure_sh = Figure(figsize=figsize)
         self.canvas_sh = FigureCanvas(self.figure_sh)
         sh_layout.addWidget(self.canvas_sh)
 
@@ -699,7 +700,7 @@ class MainWindow(QMainWindow):
         bargraph_N_widget = QWidget()
         bargraph_N_layout = QVBoxLayout()
 
-        self.figure_bargraph_N = Figure()
+        self.figure_bargraph_N = Figure(figsize=figsize)
         self.canvas_bargraph_N = FigureCanvas(self.figure_bargraph_N)
         bargraph_N_layout.addWidget(self.canvas_bargraph_N)
 
@@ -713,7 +714,7 @@ class MainWindow(QMainWindow):
         bargraph_A_widget = QWidget()
         bargraph_A_layout = QVBoxLayout()
 
-        self.figure_bargraph_A= Figure()
+        self.figure_bargraph_A= Figure(figsize=figsize)
         self.canvas_bargraph_A = FigureCanvas(self.figure_bargraph_A)
         bargraph_A_layout.addWidget(self.canvas_bargraph_A)
 
@@ -727,7 +728,7 @@ class MainWindow(QMainWindow):
         scattering_surface_widget = QWidget()
         scattering_surface_layout = QVBoxLayout()
 
-        self.figure_scattering_surface = Figure()
+        self.figure_scattering_surface = Figure(figsize=figsize)
         self.canvas_scattering_surface = FigureCanvas(self.figure_scattering_surface)
         scattering_surface_layout.addWidget(self.canvas_scattering_surface)
 
@@ -741,7 +742,7 @@ class MainWindow(QMainWindow):
         scattering_bottom_widget = QWidget()
         scattering_bottom_layout = QVBoxLayout()
 
-        self.figure_scattering_bottom = Figure()
+        self.figure_scattering_bottom = Figure(figsize=figsize)
         self.canvas_scattering_bottom = FigureCanvas(self.figure_scattering_bottom)
         scattering_bottom_layout.addWidget(self.canvas_scattering_bottom)
 
@@ -756,7 +757,7 @@ class MainWindow(QMainWindow):
         bargraph_VS_widget = QWidget()
         bargraph_VS_layout = QVBoxLayout()
 
-        self.figure_bargraph_VS= Figure()
+        self.figure_bargraph_VS= Figure(figsize=figsize)
         self.canvas_bargraph_VS = FigureCanvas(self.figure_bargraph_VS)
         bargraph_VS_layout.addWidget(self.canvas_bargraph_VS)
 
@@ -1148,16 +1149,19 @@ class MainWindow(QMainWindow):
 
     def save_plot(self):
         print('--- START SAVE PLOTS')
-        self.figure_pod.savefig('plot_pod.png')
-        self.figure_es.savefig('plot_es.png')
-        self.figure_cp.savefig('plot_cp.png')
-        self.figure_sh.savefig('plot_sh.png')
-        self.figure_noise.savefig('plot_noise.png')
-        self.figure_scattering_bottom.savefig('plot_scattering_bottom.png')
-        self.figure_scattering_surface.savefig('plot_scattering_surface.png')
-        self.figure_bargraph_N.savefig('plot_bargraph_N.png')
-        self.figure_bargraph_A.savefig('plot_bargraph_A.png')
-        self.figure_bargraph_VS.savefig('plot_bargraph_VS.png')
+        dpi = 150
+
+        #figure_size = (6, 4)  # Width: 6 inches, Height: 4 inches
+        self.figure_pod.savefig('plot_pod.png', dpi=dpi)
+        self.figure_es.savefig('plot_es.png', dpi=dpi)
+        self.figure_cp.savefig('plot_cp.png', dpi=dpi)
+        self.figure_sh.savefig('plot_sh.png', dpi=dpi)
+        self.figure_noise.savefig('plot_noise.png', dpi=dpi)
+        self.figure_scattering_bottom.savefig('plot_scattering_bottom.png', dpi=dpi)
+        self.figure_scattering_surface.savefig('plot_scattering_surface.png', dpi=dpi)
+        self.figure_bargraph_N.savefig('plot_bargraph_N.png', dpi=dpi)
+        self.figure_bargraph_A.savefig('plot_bargraph_A.png', dpi=dpi)
+        self.figure_bargraph_VS.savefig('plot_bargraph_VS.png', dpi=dpi)
 
         # Open a file for writing
         with open('variables.txt', 'w') as file:
