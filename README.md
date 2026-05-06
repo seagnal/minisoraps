@@ -1,5 +1,5 @@
 # minisoraps
-mini-SORAPS is a free, lightweight version of SORAPS for public use. It simulates acoustic wave propagation in a 1D marine environment, aiding predictions for sonar and underwater communication systems.
+mini-SORAPS is a free, lightweight version of SORAPS for public use. It simulates acoustic wave propagation in a **1D marine environment** (where the result is computed as a function of horizontal distance), aiding predictions for sonar and underwater communication systems.
 
 # Installation Procedure
 
