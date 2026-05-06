@@ -31,10 +31,14 @@ import sys
 import argparse
 import numpy as np
 import math
+import types
+
 from PyQt5.QtWidgets import QStatusBar, QAction, QScrollArea, QApplication, QMainWindow, QDockWidget, QVBoxLayout, QGridLayout, QWidget, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QLabel, QSplashScreen, QTextBrowser
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
 from matplotlib.figure import Figure
 from matplotlib.widgets import Cursor
 
@@ -446,6 +450,31 @@ class MainWindow(QMainWindow):
         self.args = args
         self.initUI()
 
+    def create_dock(self, name="unknown"):
+        
+        figsize=(6, 6)
+
+        dock = QDockWidget(name, self)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+
+        plot_widget = QWidget()
+        plot_layout = QVBoxLayout()
+        
+        res = {}
+        res['fig'] = Figure(figsize=figsize)
+        res['canvas'] = FigureCanvas(res['fig'])
+        res['canvas'].mpl_connect("motion_notify_event", self.on_mouse_move)
+        res['canvas'].mpl_connect('scroll_event', self.on_mousewheel_move)
+        res['toolbar'] = NavigationToolbar(res['canvas'], self)
+
+        plot_layout.addWidget(res['toolbar'])
+        plot_layout.addWidget(res['canvas'])
+        plot_widget.setLayout(plot_layout)
+
+        dock.setWidget(plot_widget)
+        res['dock'] = dock
+        return res
+
     def initUI(self):
         self.setWindowTitle('mini SORAPS by SEAGNAL')
         self.setGeometry(100, 100, 800, 600)
@@ -666,158 +695,21 @@ class MainWindow(QMainWindow):
         dock_config.setWidget(scroll_area)
         scroll_area.setMaximumWidth(300)
 
-        figsize=(6, 6)
 
         # Dock pour les plots ES
-        dock_es = QDockWidget('Plots ES', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_es)
-
-        plot_widget = QWidget()
-        plot_layout = QVBoxLayout()
-
-        self.figure_es = Figure(figsize=figsize)
-        self.canvas_es = FigureCanvas(self.figure_es)
-        self.canvas_es.mpl_connect("motion_notify_event", self.on_mouse_move)
-
-        plot_layout.addWidget(self.canvas_es)
-
-        plot_widget.setLayout(plot_layout)
-        dock_es.setWidget(plot_widget)
+        self.docks = {}
+        self.docks['es'] = self.create_dock(name='ES')
+        self.docks['pod'] = self.create_dock(name='POD')
+        self.docks['cp'] = self.create_dock(name='CP')
+        self.docks['noises'] = self.create_dock(name='Noises')
+        self.docks['voltage'] = self.create_dock(name='Voltage')
+        self.docks['na'] = self.create_dock(name='Ambiant Noise')
+        self.docks['absorption'] = self.create_dock(name='Absorption')
+        self.docks['ss'] = self.create_dock(name='Surface Scattering')
+        self.docks['bs'] = self.create_dock(name='Bottom Scattering')
+        self.docks['vs'] = self.create_dock(name='Volume Scattering')
+ 
         
-        # Dock pour les plots POD
-        dock_pod = QDockWidget('Plots POD', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_pod)
-
-        plot_widget = QWidget()
-        plot_layout = QVBoxLayout()
-
-        self.figure_pod = Figure(figsize=figsize)
-        self.canvas_pod = FigureCanvas(self.figure_pod)
-        self.canvas_pod.mpl_connect("motion_notify_event", self.on_mouse_move)
-        plot_layout.addWidget(self.canvas_pod)
-
-        plot_widget.setLayout(plot_layout)
-        dock_pod.setWidget(plot_widget)
-
-        # Dock pour le plot CP
-        dock_cp = QDockWidget('Plot CP', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_cp)
-
-        cp_widget = QWidget()
-        cp_layout = QVBoxLayout()
-
-        self.figure_cp = Figure(figsize=figsize)
-        self.canvas_cp = FigureCanvas(self.figure_cp)
-        self.canvas_cp.mpl_connect("motion_notify_event", self.on_mouse_move)
-        cp_layout.addWidget(self.canvas_cp)
-
-        cp_widget.setLayout(cp_layout)
-        dock_cp.setWidget(cp_widget)
-
-        # Dock pour le plot Noises
-        dock_noise = QDockWidget('Plot Noises', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_noise)
-
-        noise_widget = QWidget()
-        noise_layout = QVBoxLayout()
-
-        self.figure_noise = Figure(figsize=figsize)
-        self.canvas_noise = FigureCanvas(self.figure_noise)
-        self.canvas_noise.mpl_connect("motion_notify_event", self.on_mouse_move)
-        noise_layout.addWidget(self.canvas_noise)
-
-        noise_widget.setLayout(noise_layout)
-        dock_noise.setWidget(noise_widget)
-
-        # Dock pour le plot SH
-        dock_v = QDockWidget('Plot Tension', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_v)
-
-        sh_widget = QWidget()
-        sh_layout = QVBoxLayout()
-
-        self.figure_volt = Figure(figsize=figsize)
-        self.canvas_volt = FigureCanvas(self.figure_volt)
-        self.canvas_volt.mpl_connect("motion_notify_event", self.on_mouse_move)
-        sh_layout.addWidget(self.canvas_volt)
-
-        sh_widget.setLayout(sh_layout)
-        dock_v.setWidget(sh_widget)
-
-
-        # Dock pour le bar graph de N en fonction de f
-        dock_bargraph_N = QDockWidget('Noise', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_bargraph_N)
-
-        bargraph_N_widget = QWidget()
-        bargraph_N_layout = QVBoxLayout()
-
-        self.figure_bargraph_N = Figure(figsize=figsize)
-        self.canvas_bargraph_N = FigureCanvas(self.figure_bargraph_N)
-        bargraph_N_layout.addWidget(self.canvas_bargraph_N)
-
-        bargraph_N_widget.setLayout(bargraph_N_layout)
-        dock_bargraph_N.setWidget(bargraph_N_widget)
-
-        # Dock pour le bar graph de N en fonction de f
-        dock_bargraph_A = QDockWidget('Absorption', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_bargraph_A)
-
-        bargraph_A_widget = QWidget()
-        bargraph_A_layout = QVBoxLayout()
-
-        self.figure_bargraph_A= Figure(figsize=figsize)
-        self.canvas_bargraph_A = FigureCanvas(self.figure_bargraph_A)
-        bargraph_A_layout.addWidget(self.canvas_bargraph_A)
-
-        bargraph_A_widget.setLayout(bargraph_A_layout)
-        dock_bargraph_A.setWidget(bargraph_A_widget)
-
-        # Dock pour le plot Scattering en fonction de l'angle
-        dock_scattering_surface = QDockWidget('Scattering Surface', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_scattering_surface)
-
-        scattering_surface_widget = QWidget()
-        scattering_surface_layout = QVBoxLayout()
-
-        self.figure_scattering_surface = Figure(figsize=figsize)
-        self.canvas_scattering_surface = FigureCanvas(self.figure_scattering_surface)
-        self.canvas_scattering_surface.mpl_connect("motion_notify_event", self.on_mouse_move)
-        scattering_surface_layout.addWidget(self.canvas_scattering_surface)
-
-        scattering_surface_widget.setLayout(scattering_surface_layout)
-        dock_scattering_surface.setWidget(scattering_surface_widget)
-
-        # Dock pour le plot Scattering en fonction de l'angle
-        dock_scattering_bottom = QDockWidget('Scattering bottom', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_scattering_bottom)
-
-        scattering_bottom_widget = QWidget()
-        scattering_bottom_layout = QVBoxLayout()
-
-        self.figure_scattering_bottom = Figure(figsize=figsize)
-        self.canvas_scattering_bottom = FigureCanvas(self.figure_scattering_bottom)
-        self.canvas_scattering_bottom.mpl_connect("motion_notify_event", self.on_mouse_move)
-        scattering_bottom_layout.addWidget(self.canvas_scattering_bottom)
-
-        scattering_bottom_widget.setLayout(scattering_bottom_layout)
-        dock_scattering_bottom.setWidget(scattering_bottom_widget)
-
-
-        # Dock pour le bar graph de N en fonction de f
-        dock_bargraph_VS = QDockWidget('Volume Scattering', self)
-        self.addDockWidget(Qt.RightDockWidgetArea, dock_bargraph_VS)
-
-        bargraph_VS_widget = QWidget()
-        bargraph_VS_layout = QVBoxLayout()
-
-        self.figure_bargraph_VS= Figure(figsize=figsize)
-        self.canvas_bargraph_VS = FigureCanvas(self.figure_bargraph_VS)
-        bargraph_VS_layout.addWidget(self.canvas_bargraph_VS)
-
-        bargraph_VS_widget.setLayout(bargraph_VS_layout)
-        dock_bargraph_VS.setWidget(bargraph_VS_widget)
-
         # Create a QDockWidget
         dock_about = QDockWidget("About SORAPS", self)
         dock_about.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -841,27 +733,17 @@ class MainWindow(QMainWindow):
         dock_about.setWidget(text_browser)
         self.addDockWidget(Qt.RightDockWidgetArea, dock_about)
 
-        self.tabifyDockWidget(dock_about, dock_bargraph_N)
-        self.tabifyDockWidget(dock_bargraph_N, dock_bargraph_A)
-        self.tabifyDockWidget(dock_bargraph_A, dock_bargraph_VS)
-        self.tabifyDockWidget(dock_bargraph_VS, dock_scattering_surface)
-        self.tabifyDockWidget(dock_scattering_surface, dock_scattering_bottom)
-        self.tabifyDockWidget(dock_scattering_bottom, dock_v)
-        self.tabifyDockWidget(dock_v, dock_noise)
-        self.tabifyDockWidget(dock_noise, dock_cp)
-        self.tabifyDockWidget(dock_cp, dock_pod)
-        self.tabifyDockWidget(dock_pod, dock_es)
+        self.tabifyDockWidget(dock_about, self.docks['na']['dock'])
+        self.tabifyDockWidget(self.docks['na']['dock'], self.docks['absorption']['dock'])
+        self.tabifyDockWidget(self.docks['absorption']['dock'], self.docks['vs']['dock'])
+        self.tabifyDockWidget(self.docks['vs']['dock'], self.docks['ss']['dock'])
+        self.tabifyDockWidget(self.docks['ss']['dock'], self.docks['bs']['dock'])
+        self.tabifyDockWidget(self.docks['bs']['dock'], self.docks['voltage']['dock'])
+        self.tabifyDockWidget(self.docks['voltage']['dock'], self.docks['noises']['dock'])
+        self.tabifyDockWidget(self.docks['noises']['dock'], self.docks['cp']['dock'])
+        self.tabifyDockWidget(self.docks['cp']['dock'], self.docks['pod']['dock'])
+        self.tabifyDockWidget(self.docks['pod']['dock'], self.docks['es']['dock'])
 
-        self.dock_bargraph_N = dock_bargraph_N
-        self.dock_bargraph_A = dock_bargraph_A
-        self.dock_bargraph_VS = dock_bargraph_VS
-        self.dock_scattering_surface = dock_scattering_surface
-        self.dock_scattering_bottom = dock_scattering_bottom
-        self.dock_v = dock_v
-        self.dock_noise = dock_noise
-        self.dock_cp = dock_cp
-        self.dock_pod = dock_pod
-        self.dock_es = dock_es
 
         self.init = True
         self.update_plots()
@@ -875,9 +757,26 @@ class MainWindow(QMainWindow):
         if event.inaxes:
             # Get the mouse coordinates in data units
             x, y = event.xdata, event.ydata
-            print(f"x: {x:.2f}, y: {y:.2f}")
+            #print(f"x: {x:.2f}, y: {y:.2f}")
             # Update the status bar
             self.status_bar.showMessage(f"x: {x:.2f}, y: {y:.2f}")
+
+    def on_mousewheel_move(self,  event):
+        print(event)
+        ax=event.inaxes
+        ax._pan_start = types.SimpleNamespace(
+                lim=ax.viewLim.frozen(),
+                trans=ax.transData.frozen(),
+                trans_inverse=ax.transData.inverted().frozen(),
+                bbox=ax.bbox.frozen(),
+                x=event.x,
+                y=event.y)
+        if event.button == 'up':
+            ax.drag_pan(3, event.key, event.x+10, event.y+10)
+        else: #event.button == 'down':
+            ax.drag_pan(3, event.key, event.x-10, event.y-10)
+        fig=ax.get_figure()
+        fig.canvas.draw_idle()
 
     def update_plots(self):
         if not self.init:
@@ -1071,8 +970,8 @@ class MainWindow(QMainWindow):
             POD_o=1/2-np_erf((np.sqrt(K)*(dt_s-E_S))/(np.sqrt(2)*S_n))/2;
         
         # Plot POD
-        self.figure_pod.clear()
-        ax_pod = self.figure_pod.add_subplot(111)
+        self.docks['pod']['fig'].clear()
+        ax_pod = self.docks['pod']['fig'].add_subplot(111)
         cursor_pod = Cursor(ax_pod, color='black', linewidth=1)
         ax_pod.plot(d, POD_o[:, 0], label='Fmin', color='blue')
         ax_pod.plot(d, POD_o[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1083,11 +982,11 @@ class MainWindow(QMainWindow):
         ax_pod.set_ylabel('POD (dB)')
         ax_pod.set_title(f'POD {self.combo_type.currentText()}')
         ax_pod.set_ylim(-0.1, 1.1)
-        self.canvas_pod.draw()
+        self.docks['pod']['canvas'].draw()
 
         # Plot ES
-        self.figure_es.clear()
-        ax_es = self.figure_es.add_subplot(111)
+        self.docks['es']['fig'].clear()
+        ax_es = self.docks['es']['fig'].add_subplot(111)
         cursor_es = Cursor(ax_es, color='black', linewidth=1)
         ax_es.plot(d, ES_db[:, 0], label='Fmin', color='blue')
         ax_es.plot(d, ES_db[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1097,11 +996,11 @@ class MainWindow(QMainWindow):
         ax_es.set_xlabel('Distance (m)')
         ax_es.set_ylabel('ES (dB)')
         ax_es.set_title(f'ES {self.combo_type.currentText()}')
-        self.canvas_es.draw()
+        self.docks['es']['canvas'].draw()
 
         # Plot CP
-        self.figure_cp.clear()
-        ax_cp = self.figure_cp.add_subplot(111)
+        self.docks['cp']['fig'].clear()
+        ax_cp = self.docks['cp']['fig'].add_subplot(111)
         cursor_cp = Cursor(ax_cp, color='black', linewidth=1)
         ax_cp.plot(d, CP[:, 0], label='Fmin', color='blue')
         ax_cp.plot(d, CP[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1111,7 +1010,7 @@ class MainWindow(QMainWindow):
         ax_cp.set_xlabel('Distance (m)')
         ax_cp.set_ylabel('Field of loss (dB)')
         ax_cp.set_title(f'Field of loss')
-        self.canvas_cp.draw()
+        self.docks['cp']['canvas'].draw()
 
         # Plot N
         #print(Nt.shape)
@@ -1122,8 +1021,8 @@ class MainWindow(QMainWindow):
         #print(Ntrv.shape)
         #print(Ntrss.shape)
         #print(Ntrbs.shape)
-        self.figure_noise.clear()
-        ax_noise = self.figure_noise.add_subplot(111)
+        self.docks['noises']['fig'].clear()
+        ax_noise = self.docks['noises']['fig'].add_subplot(111)
 
         if is_active:
             #cursor_noise = Cursor(ax_noise, color='black', linewidth=2)
@@ -1166,11 +1065,11 @@ class MainWindow(QMainWindow):
             ax_noise.set_title(f'Total Noise over Bandwidth - SeaState:{SeaState} - Nte:{Nte}')
             ax_noise.grid(axis='y')
 
-        self.canvas_noise.draw()
+        self.docks['noises']['canvas'].draw()
 
         # Plot SH
-        self.figure_volt.clear()
-        ax_volt = self.figure_volt.add_subplot(111)
+        self.docks['voltage']['fig'].clear()
+        ax_volt = self.docks['voltage']['fig'].add_subplot(111)
         #cursor_volt = Cursor(ax_volt, color='black', linewidth=1)
         ax_volt.semilogy(d, V[:,0], label='Fmin', color='blue')
         ax_volt.semilogy(d, V[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1180,11 +1079,11 @@ class MainWindow(QMainWindow):
         ax_volt.set_xlabel('Distance (m)')
         ax_volt.set_ylabel('Vrms')
         ax_volt.set_title(f'Voltage at sensor')
-        self.canvas_volt.draw()
+        self.docks['voltage']['canvas'].draw()
 
         # Bar Graph N vs f
-        self.figure_bargraph_N.clear()
-        ax_bargraph_N = self.figure_bargraph_N.add_subplot(111)
+        self.docks['na']['fig'].clear()
+        ax_bargraph_N = self.docks['na']['fig'].add_subplot(111)
         #cursor_bargraph_N = Cursor(ax_bargraph_N, color='black', linewidth=2)
         ax_bargraph_N.bar(['Fmin','Fmoy','Fmax'], Na, color=['blue','gray','red'])
         ax_bargraph_N.set_xlabel('Frequency (Hz)')
@@ -1192,11 +1091,11 @@ class MainWindow(QMainWindow):
         ax_bargraph_N.set_title(f'Ambiant Noise over Bandwidth - SeaState:{SeaState}')
 
         ax_bargraph_N.grid(axis='y')
-        self.canvas_bargraph_N.draw()
+        self.docks['na']['canvas'].draw()
 
         VS = volume_scattering_strength(f,turbidity=Turbidity)
-        self.figure_bargraph_VS.clear()
-        ax_bargraph_VS = self.figure_bargraph_VS.add_subplot(111)
+        self.docks['vs']['fig'].clear()
+        ax_bargraph_VS = self.docks['vs']['fig'].add_subplot(111)
         #cursor_bargraph_VS = Cursor(ax_bargraph_VS, color='black', linewidth=2)
         ax_bargraph_VS.bar(['Fmin','Fmoy','Fmax'], VS, color=['blue','gray','red'])
         ax_bargraph_VS.set_xlabel('Frequency (Hz)')
@@ -1204,25 +1103,25 @@ class MainWindow(QMainWindow):
         ax_bargraph_VS.set_title(f'Volume Scattering over Bandwidth - SeaType:{SeaBedType}')
 
         ax_bargraph_VS.grid(axis='y')
-        self.canvas_bargraph_VS.draw()
+        self.docks['vs']['canvas'].draw()
 
         # Bar Graph N vs f
-        self.figure_bargraph_A.clear()
-        ax_bargraph_A = self.figure_bargraph_A.add_subplot(111)
+        self.docks['absorption']['fig'].clear()
+        ax_bargraph_A = self.docks['absorption']['fig'].add_subplot(111)
         #cursor_bargraph_A = Cursor(ax_bargraph_A, color='black', linewidth=2)
         ax_bargraph_A.bar(['Fmin','Fmoy','Fmax'], alpha, color=['blue','gray','red'])
         ax_bargraph_A.set_xlabel('Frequency (Hz)')
         ax_bargraph_A.set_ylabel('absorption db/m')
         ax_bargraph_A.set_title(f'Absorption over Bandwidth - T:{Temp} - D:{Depth}')
         ax_bargraph_A.grid(axis='y')
-        self.canvas_bargraph_A.draw()
+        self.docks['absorption']['canvas'].draw()
 
         # Plot Scattering
         angles_deg  = np.linspace(0, 90, 90)
         SS = surface_scattering_strength(angles_deg,f,SeaState)
         
-        self.figure_scattering_surface.clear()
-        ax_scattering_surface = self.figure_scattering_surface.add_subplot(111)
+        self.docks['ss']['fig'].clear()
+        ax_scattering_surface = self.docks['ss']['fig'].add_subplot(111)
         #cursor_scattering_surface = Cursor(ax_scattering_surface, color='black', linewidth=2)
         ax_scattering_surface.plot(angles_deg, SS[:, 0], label='Fmin', color='blue')
         ax_scattering_surface.plot(angles_deg, SS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1232,12 +1131,12 @@ class MainWindow(QMainWindow):
         ax_scattering_surface.set_xlabel('Angle (deg)')
         ax_scattering_surface.set_ylabel('dB')
         ax_scattering_surface.set_title(f'Surface scattering')
-        self.canvas_scattering_surface.draw()
+        self.docks['ss']['canvas'].draw()
 
         BS = bottom_scattering_strength(angles_deg,f,SeaBedType)
         #print(BS)
-        self.figure_scattering_bottom.clear()
-        ax_scattering_bottom = self.figure_scattering_bottom.add_subplot(111)
+        self.docks['bs']['fig'].clear()
+        ax_scattering_bottom = self.docks['bs']['fig'].add_subplot(111)
         #cursor_scattering_bottom = Cursor(ax_scattering_bottom, color='black', linewidth=2)
         ax_scattering_bottom.plot(angles_deg, BS[:, 0], label='Fmin', color='blue')
         ax_scattering_bottom.plot(angles_deg, BS[:, 1], label='Fmoy', color='gray', linestyle='dotted')
@@ -1247,7 +1146,7 @@ class MainWindow(QMainWindow):
         ax_scattering_bottom.set_xlabel('Angle (deg)')
         ax_scattering_bottom.set_ylabel('dB')
         ax_scattering_bottom.set_title(f'Bottom scattering')
-        self.canvas_scattering_bottom.draw()
+        self.docks['bs']['canvas'].draw()
 
         #print('--- END UPDATE PLOTS')
 
@@ -1258,11 +1157,11 @@ class MainWindow(QMainWindow):
         #figure_size = (6, 4)  # Width: 6 inches, Height: 4 inches
         self.dock_pod.show()
         self.dock_pod.raise_()
-        self.figure_pod.savefig('plot_pod.png', dpi=dpi)
+        self.docks['pod']['fig'].savefig('plot_pod.png', dpi=dpi)
         
         self.dock_es.show()
         self.dock_es.raise_()
-        self.figure_es.savefig('plot_es.png', dpi=dpi)
+        self.docks['pod']['fig'].savefig('plot_es.png', dpi=dpi)
 
         self.dock_cp.show()
         self.dock_cp.raise_()
